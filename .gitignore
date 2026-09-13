@@ -16,6 +16,9 @@ node_modules
 # Local CodeGraph index
 /.codegraph/
 
+# Local scratch workspace (per-ticket issue notes, coldstart JSON drops)
+/.scratch/
+
 # local env files
 .env
 .env.*

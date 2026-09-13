@@ -80,7 +80,11 @@ describe('champion insight lifecycle', () => {
       .toBeLessThan(inProgressRecoveryBlock.indexOf('if (!canRefreshVisiblePopup)'))
     expect(inProgressRecoveryBlock.indexOf('lastInProgressInsightChampionId = championId'))
       .toBeLessThan(inProgressRecoveryBlock.indexOf('if (!canRefreshVisiblePopup)'))
-    expect(ipcHandlers.match(/if \(!shouldShowChampionDetails\(\)\)/g)).toHaveLength(6)
+    // M0-B removed two of the six shouldShowChampionDetails() gates
+    // (the ARAM-bench-recommendation and item-set-install branches that
+    // were tied to the now-deleted ARAM business). The four that remain
+    // are still gated the same way.
+    expect(ipcHandlers.match(/if \(!shouldShowChampionDetails\(\)\)/g)).toHaveLength(4)
     expect(appConfig).toContain('applyPopupWindowPreferences(phase)')
   })
 })
