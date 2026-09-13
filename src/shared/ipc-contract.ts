@@ -207,6 +207,59 @@ export interface LocaleChangedPayload extends LooseRecord {
   dataVersion?: string
 }
 
+export type ArenaAugmentPerfStat = {
+  augmentId: number
+  averagePlacement: number | null
+  firstPlaceRate: number | null
+  pickRate: number | null
+  sampleSize: number | null
+}
+
+export type ArenaAugmentStatsBundle = {
+  fetchedAt: string
+  source: 'mock' | 'communitydragon' | 'opgg' | 'riot-api'
+  /** True when records are seeded deterministically rather than sourced
+   *  from real gameplay data. UI layers should suppress precision and
+   *  flag the bundle as a placeholder. */
+  mock: boolean
+  records: ArenaAugmentPerfStat[]
+}
+
+export type ArenaAugmentRarity = 'silver' | 'gold' | 'prismatic' | 'unknown'
+
+export type ArenaAugmentLeaderboardRow = {
+  augmentId: number
+  displayName: { en: string, zh: string }
+  rarity: ArenaAugmentRarity
+  iconLarge: string | null
+  iconSmall: string | null
+  averagePlacement: number | null
+  firstPlaceRate: number | null
+  pickRate: number | null
+  sampleSize: number | null
+}
+
+export type ArenaAugmentRankOrder = 'placement' | 'firstplace' | 'picks'
+
+export type ArenaAugmentRankedSet = {
+  placement: ArenaAugmentLeaderboardRow[]
+  firstplace: ArenaAugmentLeaderboardRow[]
+  picks: ArenaAugmentLeaderboardRow[]
+}
+
+export interface ArenaAugmentStatsRequest {
+  championId: number
+  patch?: string
+  /** Cap per-rank row count. Defaults to 20. */
+  limit?: number
+}
+
+export interface ArenaAugmentStatsResult extends OperationResult {
+  bundle?: ArenaAugmentStatsBundle
+  ranked?: ArenaAugmentRankedSet
+  sourceLabel?: string
+}
+
 export interface ElectronEventMap {
   fromMain: [payload?: unknown]
   'for-popup': [payload: OverlayPayload]
@@ -303,6 +356,9 @@ export interface ElectronAPI {
   }
   shell: {
     openExternal(url: string): Promise<OperationResult>
+  }
+  arenaAugmentData: {
+    getStats(request: ArenaAugmentStatsRequest): Promise<ArenaAugmentStatsResult>
   }
   events: {
     on<K extends ElectronEventChannel>(

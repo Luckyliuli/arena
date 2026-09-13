@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
+  ArenaAugmentStatsRequest,
+  ArenaAugmentStatsResult,
   ElectronAPI,
   ElectronEventChannel,
   ElectronEventMap,
@@ -135,6 +137,10 @@ const electronAPI: ElectronAPI = {
       }
       return ipcRenderer.invoke('shell-open-external', parsedUrl.toString())
     },
+  },
+  arenaAugmentData: {
+    getStats: (request: ArenaAugmentStatsRequest): Promise<ArenaAugmentStatsResult> =>
+      ipcRenderer.invoke('arena-augment:get-stats', request),
   },
   events: { on, once },
 }

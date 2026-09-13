@@ -1,4 +1,8 @@
-import type { ElectronAPI } from '../../shared/ipc-contract.ts'
+import type {
+  ArenaAugmentStatsRequest,
+  ArenaAugmentStatsResult,
+  ElectronAPI,
+} from '../../shared/ipc-contract.ts'
 
 const getElectronAPI = () => window.electronAPI
 
@@ -87,6 +91,10 @@ export const electronAPI: ElectronAPI = {
   },
   shell: {
     openExternal: (...args) => requireElectronAPI().shell.openExternal(...args),
+  },
+  arenaAugmentData: {
+    getStats: (...args: [ArenaAugmentStatsRequest]): Promise<ArenaAugmentStatsResult> =>
+      requireElectronAPI().arenaAugmentData.getStats(...args),
   },
   events: {
     on: (...args) => requireElectronAPI().events.on(...args),

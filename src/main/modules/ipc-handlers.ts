@@ -873,6 +873,73 @@ export function registerIpcHandlers(_isDev: boolean): void {
         return { success: true }
     })
 
+    ipcMain.handle('arena-augment:get-stats', async (_event, request) => {
+        const startedAt = Date.now()
+        const championId = Number(request?.championId)
+        if (!Number.isFinite(championId) || championId <= 0) {
+            return { success: false, error: 'championId is required' }
+        }
+        const patch = typeof request?.patch === 'string' ? request.patch : undefined
+        const limitRaw = Number(request?.limit)
+        const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 20
+
+        try {
+            const { selectAugmentSource, rankAugmentStats } = await import(
+                '../services/arena-augment-data/index.ts'
+            )
+            const source = selectAugmentSource()
+            const bundle = await source.getStatsForChampion(championId, patch ? { patch } : undefined)
+
+            // Join with the catalog so the renderer can render rows without
+            // an extra round-trip. Rows whose augment id is missing from
+            // the catalog are silently dropped — defensive only.
+            const { findAugmentById } = await import('../../shared/augment-dictionary.ts')
+            const records = bundle.records.map(r => {
+                const catalog = findAugmentById(r.augmentId)
+                if (!catalog) return null
+                return {
+                    augmentId: r.augmentId,
+                    displayName: catalog.displayName,
+                    rarity: catalog.rarity,
+                    iconLarge: catalog.iconLarge,
+                    iconSmall: catalog.iconSmall,
+                    averagePlacement: r.averagePlacement,
+                    firstPlaceRate: r.firstPlaceRate,
+                    pickRate: r.pickRate,
+                    sampleSize: r.sampleSize,
+                }
+            }).filter(r => r !== null)
+
+            const ranked = {
+                placement: rankAugmentStats(records as never, 'placement').slice(0, limit),
+                firstplace: rankAugmentStats(records as never, 'firstplace').slice(0, limit),
+                picks: rankAugmentStats(records as never, 'picks').slice(0, limit),
+            }
+
+            logger.info('[arena-augment] stats served', {
+                championId,
+                source: source.id,
+                patch: patch || 'current',
+                recordCount: bundle.records.length,
+                joinedCount: records.length,
+                durationMs: getElapsedMs(startedAt),
+            })
+
+            return {
+                success: true,
+                bundle,
+                ranked,
+                sourceLabel: source.label,
+            }
+        } catch (error) {
+            logger.error('[arena-augment] stats failed:', error)
+            return {
+                success: false,
+                error: getErrorMessage(error),
+            }
+        }
+    })
+
     ipcMain.on('log-renderer-info', (_event, data = {}) => {
         logger.debug('Renderer info reported:', {
             type: data.type || 'renderer-info',

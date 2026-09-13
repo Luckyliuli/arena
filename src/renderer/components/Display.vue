@@ -206,6 +206,7 @@
 
                 <OverlayPreferences />
                 <ChampionMonitor />
+                <ArenaLeaderboard />
 
 
                 <section class="diagnostic-panel">
@@ -334,6 +335,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import OverlayPreferences from './OverlayPreferences.vue'
 import ChampionMonitor from './ChampionMonitor.vue'
+import ArenaLeaderboard from './ArenaLeaderboard.vue'
 import FeedbackWidget from './FeedbackWidget.vue'
 import {
     Select,
