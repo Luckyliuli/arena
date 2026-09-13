@@ -74,7 +74,7 @@ function fuzzyFind(text: string, name: string): FuzzyMatch | null {
   const nameLen = name.length
   const textLen = text.length
 
-  if (nameLen === 0 || textLen < nameLen) {
+  if (nameLen === 0 || textLen < Math.max(1, nameLen - 1)) {
     return null
   }
 
@@ -104,11 +104,20 @@ function fuzzyFind(text: string, name: string): FuzzyMatch | null {
   const maxDistance = nameLen === 3 ? 1 : Math.floor(nameLen / 3)
   let bestMatch: FuzzyMatch | null = null
 
-  for (let i = 0; i <= textLen - nameLen; i++) {
-    const window = text.slice(i, i + nameLen)
-    const dist = editDistance(window, name)
-    if (dist <= maxDistance && (!bestMatch || dist < bestMatch.distance)) {
-      bestMatch = { index: i, distance: dist, matchLen: nameLen }
+  // Slide windows of length nameLen +/- 1 so a single-character OCR drop
+  // ("WillingSacrifice" -> "witingSacrifice") doesn't disqualify the slot.
+  // The earlier equal-length-only check above (L77) used `textLen < nameLen`
+  // as a hard fail; this loop recovers the case the check rejects.
+  const minWindowLen = Math.max(1, nameLen - 1)
+  const maxWindowLen = Math.min(textLen, nameLen + 1)
+
+  for (let winLen = minWindowLen; winLen <= maxWindowLen; winLen++) {
+    for (let i = 0; i <= textLen - winLen; i++) {
+      const window = text.slice(i, i + winLen)
+      const dist = editDistance(window, name)
+      if (dist <= maxDistance && (!bestMatch || dist < bestMatch.distance)) {
+        bestMatch = { index: i, distance: dist, matchLen: winLen }
+      }
     }
   }
 
