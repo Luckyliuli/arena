@@ -5,7 +5,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import url from 'node:url'
+import { requireResourceFile } from './resource-path.ts'
 
 export type AugmentRarity = 'silver' | 'gold' | 'prismatic' | 'unknown'
 
@@ -22,21 +22,11 @@ export type ArenaAugmentRecord = {
 
 const DEFAULT_RELATIVE = path.join('resources', 'augments-arena.json')
 
-function resolvePath(rel: string): string {
-  // Resolve against the arena project root. The dictionary file lives
-  // at arena/resources/augments-arena.json regardless of where the
-  // caller sits in the source tree. relative to src/shared/ we need
-  // two up-elevations to land at the project root.
-  if (path.isAbsolute(rel)) return rel
-  const here = path.dirname(url.fileURLToPath(import.meta.url))
-  return path.resolve(here, '..', '..', rel)
-}
-
 let cached: readonly ArenaAugmentRecord[] | null = null
 
 export function loadAugmentArenaDictionary(filePath?: string): readonly ArenaAugmentRecord[] {
   if (filePath) {
-    const raw = fs.readFileSync(resolvePath(filePath), 'utf8')
+    const raw = fs.readFileSync(requireResourceFile(filePath, 'augments-arena'), 'utf8')
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) {
       throw new Error('augments-arena: expected an array, got ' + typeof parsed)
@@ -44,7 +34,7 @@ export function loadAugmentArenaDictionary(filePath?: string): readonly ArenaAug
     return Object.freeze(parsed)
   }
   if (cached) return cached
-  const raw = fs.readFileSync(resolvePath(DEFAULT_RELATIVE), 'utf8')
+  const raw = fs.readFileSync(requireResourceFile(DEFAULT_RELATIVE, 'augments-arena'), 'utf8')
   const parsed = JSON.parse(raw)
   if (!Array.isArray(parsed)) {
     throw new Error('augments-arena: expected an array, got ' + typeof parsed)

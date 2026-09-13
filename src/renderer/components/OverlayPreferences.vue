@@ -48,7 +48,6 @@ import { electronAPI, hasElectronAPI } from '../native/electron-api.ts'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-const emit = defineEmits(['post-game-auto-show-changed'])
 const preferenceDefinitions = [
   {
     key: 'showChampionDetails',
@@ -85,13 +84,6 @@ const preferenceDefinitions = [
     titleKey: 'preferences.sidePanelTitle',
     descriptionKey: 'preferences.sidePanelDescription',
   },
-  {
-    key: 'autoShowPostGameShare',
-    storeKey: 'postGameShare.autoShow',
-    defaultValue: true,
-    titleKey: 'preferences.postGameShareTitle',
-    descriptionKey: 'preferences.postGameShareDescription',
-  },
 ]
 
 const preferenceItems = computed(() => preferenceDefinitions.map(item => ({
@@ -124,9 +116,6 @@ const loadPreferences = async () => {
       }
 
       preferences[item.key] = Boolean(storedValue)
-      if (item.key === 'autoShowPostGameShare') {
-        emit('post-game-auto-show-changed', preferences[item.key])
-      }
     } catch (error) {
       console.warn('读取窗口偏好失败:', item.storeKey, error)
     }
@@ -164,9 +153,6 @@ const togglePreference = async (key) => {
     await electronAPI.store.set(item.storeKey, nextValue)
     preferences[key] = nextValue
     applyImmediateWindowEffect(key, nextValue)
-    if (key === 'autoShowPostGameShare') {
-      emit('post-game-auto-show-changed', nextValue)
-    }
   } catch (error) {
     console.warn('保存窗口偏好失败:', item.storeKey, error)
   } finally {

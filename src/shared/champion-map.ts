@@ -12,7 +12,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import url from 'node:url'
+import { requireResourceFile } from './resource-path.ts'
 
 export type ArenaChampionEntry = {
   id: number
@@ -28,20 +28,14 @@ export type ArenaChampionMap = {
 
 const DEFAULT_RELATIVE = path.join('resources', 'champions-arena.json')
 
-function resolvePath(rel: string): string {
-  if (path.isAbsolute(rel)) return rel
-  const here = path.dirname(url.fileURLToPath(import.meta.url))
-  return path.resolve(here, '..', '..', rel)
-}
-
 let cached: ArenaChampionMap | null = null
 
 export function loadArenaChampionMap(filePath?: string): ArenaChampionMap {
   if (filePath) {
-    return parseChampionMap(fs.readFileSync(resolvePath(filePath), 'utf8'))
+    return parseChampionMap(fs.readFileSync(requireResourceFile(filePath, 'champions-arena'), 'utf8'))
   }
   if (cached) return cached
-  cached = parseChampionMap(fs.readFileSync(resolvePath(DEFAULT_RELATIVE), 'utf8'))
+  cached = parseChampionMap(fs.readFileSync(requireResourceFile(DEFAULT_RELATIVE, 'champions-arena'), 'utf8'))
   return cached
 }
 

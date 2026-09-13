@@ -26,21 +26,6 @@ type JsonDocument = {
 
 type SupportedDataLocale = 'zh-CN' | 'en-US' | 'zh-TW'
 
-export type MatchHistoryUploadConfig = {
-  enabled?: boolean
-  cloudflareEnabled?: boolean
-  sessionPath?: string
-  batchPath?: string
-  maxBatchSize?: number
-  collectionPolicy?: {
-    refreshCurrentMatchLimit?: number
-    matchedPlayerLimit?: number
-    matchedMatchLimit?: number
-    maxBatchesPerSync?: number
-    targetGamePatch?: string
-  }
-}
-
 export type ClientConfig = {
   service?: string
   apiVersion?: string
@@ -71,13 +56,6 @@ export type ClientConfig = {
     changelog?: unknown
     releaseNotes?: unknown
   }
-  analytics?: {
-    enabled?: boolean
-    provider?: string
-    firebaseConfig?: Record<string, string>
-    sampleRate?: number
-  }
-  matchHistoryUpload?: MatchHistoryUploadConfig
 }
 
 type ActiveDataSet = {
