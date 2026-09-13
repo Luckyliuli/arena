@@ -7,11 +7,13 @@
 //   node scripts/ocr-coldstart.mjs                                # default spikes
 //   node scripts/ocr-coldstart.mjs --image <path>                # one image
 //   node scripts/ocr-coldstart.mjs --out <path>                  # write JSON report
+//   node scripts/ocr-coldstart.mjs --write-sample                # also rank top-10 by placement / firstplace / picks
 //
 // Output structure (also echoed to stdout):
 //   {
 //     summary: { images: N, cardSlots: M, exactMatches: K, fuzzyMatches: F, unmatched: U },
 //     perImage: [{ file, cardSlots: [{ index, transcript, matched: { id, name, distance, confidence } }] }]
+//     sample?: { source, mock, topBy: { placement, firstplace, picks } }
 //   }
 //
 // Decision criterion (issues/04):
@@ -30,6 +32,9 @@ const arenaRoot = path.resolve(here, '..')
 function arg(flag, fallback) {
   const i = process.argv.indexOf(flag)
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : fallback
+}
+function hasFlag(flag) {
+  return process.argv.includes(flag)
 }
 
 const MODEL_DIR = process.env.ARAMGG_PADDLEOCR_MODEL_DIR
@@ -76,9 +81,13 @@ import {
   findAugmentByName,
 } from '../src/shared/augment-dictionary.ts'
 
+import {
+  selectAugmentSource,
+  rankAugmentStats,
+  describeAugment,
+} from '../src/main/services/arena-augment-data/index.ts'
+
 function normalizeOcrTitleText(value) {
-  // Mirror src/main/augment-title-matcher.ts:normalizeOcrTitleText so we
-  // compare like the matcher would.
   return String(value || '')
     .normalize('NFKC')
     .replace(/[\s"'“”‘’`.,，。:：;；!！?？、|｜/\\()[\]{}<>《》【】「」『』\-_=+~·•]/g, '')
@@ -96,12 +105,6 @@ function looksLikeCardTitle(box, size) {
   const h = box.height || 0
   if (w < 32 || h < 14) return false
   if (w > 360) return false
-  // Card title strips observed in fixtures + user screenshots land in two
-  // bands at the screen's vertical mid-line:
-  //   - ARAM (1920x1080) -> y ~ 418..460
-  //   - arena (1193/1210 wide, 665/681 tall, captured in-window) -> y ~ 240..300
-  // The latter is what we actually care about for coldstart. Anything in
-  // that band with a tall-enough text box is treated as a candidate.
   const inArenaBand = box.y >= 240 && box.y <= 310
   const inAramBand = box.y >= 380 && box.y <= 480
   return inArenaBand || inAramBand
@@ -125,14 +128,8 @@ function resolveSlots(slots, dictionary) {
     name: r.displayName.zh,
     rarity: r.rarity,
     iconPath: r.iconLarge || undefined,
-    // also reference en names so 'Recursion' etc. resolve when zh is empty
     _en: r.displayName.en,
   }))
-  // Inline minimal edit distance for the coldstart. We deliberately do NOT
-  // depend on the source-of-truth matcher here — the matcher would have
-  // been imported via augment-title-matcher.ts which has // @ts-nocheck
-  // and trades off general readability. This implementation only needs to
-  // recover the spike's specific ambiguities.
   function dist(a, b) {
     const m = a.length, n = b.length
     const rows = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)))
@@ -146,7 +143,6 @@ function resolveSlots(slots, dictionary) {
     return rows[m][n]
   }
   function findMatch(transcript, maxDist) {
-    // Try zh then en language buckets.
     const buckets = ['zh', 'en']
     let best = null
     for (const locale of buckets) {
@@ -171,7 +167,32 @@ function resolveSlots(slots, dictionary) {
   })
 }
 
-function main() {
+function buildSample(source, topN = 10) {
+  return {
+    source: source.id,
+    mock: true,
+    note: 'placeholder stats from the M1 adapter (deterministic mock). Real numbers from a future source swap in identical shape -- see docs/adr/0004.',
+    topBy: {
+      placement: rankAugmentStats(source, 'placement').slice(0, topN).map(s => decorate(s)),
+      firstplace: rankAugmentStats(source, 'firstplace').slice(0, topN).map(s => decorate(s)),
+      picks: rankAugmentStats(source, 'picks').slice(0, topN).map(s => decorate(s)),
+    },
+  }
+  function decorate(stat) {
+    const meta = describeAugment(stat.augmentId)
+    return {
+      augmentId: stat.augmentId,
+      name: meta ? meta.displayName.zh || meta.displayName.en : null,
+      rarity: meta ? meta.rarity : null,
+      averagePlacement: stat.averagePlacement,
+      firstPlaceRate: stat.firstPlaceRate,
+      pickRate: stat.pickRate,
+      sampleSize: stat.sampleSize,
+    }
+  }
+}
+
+async function main() {
   const inputs = resolveInputs()
   if (!inputs.length) {
     console.error('no inputs found — supply --image <path>')
@@ -213,7 +234,15 @@ function main() {
     perImage,
   }
 
-  // Print to stdout a compact table.
+  // Optional T06 sample: rank by placement / firstplace / picks using the
+  // M1 adapter seam. Writes a file under arena/.scratch/m0-tail/ so it
+  // doesn't pollute version control or the data dir.
+  if (hasFlag('--write-sample')) {
+    const src = selectAugmentSource()
+    const bundle = await src.getStatsForChampion(0)
+    report.sample = buildSample(bundle.records, 10)
+  }
+
   console.log('coldstart images=' + perImage.length + ' cardSlots=' + totalCards
     + ' exact=' + exact + ' fuzzy=' + fuzzy + ' unmatched=' + unmatched)
   for (const p of perImage) {
@@ -222,6 +251,20 @@ function main() {
       const m = s.matched
       const mdesc = m ? ('-> id=' + m.id + ' ' + m.name + ' (d=' + m.distance + ' conf=' + (s.confidence || 0).toFixed(3) + ')') : '-> UNMATCHED'
       console.log('  slot ' + s.index + ': "' + s.transcript + '" ' + mdesc)
+    }
+  }
+
+  if (report.sample) {
+    console.log('--- sample top-10 (mock data via M1 adapter)')
+    for (const [order, rows] of Object.entries(report.sample.topBy)) {
+      console.log('  by ' + order + ':')
+      for (const r of rows) {
+        console.log('    id=' + r.augmentId + ' ' + (r.name || '<unknown>')
+          + ' placement=' + r.averagePlacement
+          + ' firstplace=' + (r.firstPlaceRate ?? 0).toFixed(3)
+          + ' picks=' + (r.pickRate ?? 0).toFixed(3)
+          + ' sampleSize=' + r.sampleSize)
+      }
     }
   }
 

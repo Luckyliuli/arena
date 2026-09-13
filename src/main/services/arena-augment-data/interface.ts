@@ -27,6 +27,10 @@ export type AugmentPerfStat = {
 export type AugmentStatsBundle = {
   fetchedAt: string
   source: 'mock' | 'communitydragon' | 'opgg' | 'riot-api'
+  /** True when records are seeded from the augment id rather than real
+   *  gameplay data. UI layers should suppress precision and label these
+   *  records as placeholders. */
+  mock: boolean
   records: AugmentPerfStat[]
 }
 
@@ -59,55 +63,101 @@ export function selectAugmentSource(): ArenaAugmentSource {
   }
 }
 
+// Deterministic stat generation ----------------------------------------
+
+/**
+ * FNV-1a 32-bit hash over a non-negative integer. Stable across runs and
+ * platforms; lets us seed mock numerical stats from an augment id without
+ * pulling in a dependency.
+ */
+function fnv1a32(n: number): number {
+  let h = 2166136261
+  let v = n >>> 0
+  while (v > 0) {
+    h ^= v & 0xff
+    h = Math.imul(h, 16777619) >>> 0
+    v = v >>> 8
+  }
+  return h >>> 0
+}
+
+/**
+ * Map a hash bucket onto [lo, hi) with `decimals` fractional digits.
+ * Used for both probabilities and placement scores.
+ */
+function inRange(hash: number, lo: number, hi: number, decimals: number): number {
+  const buckets = Math.pow(10, decimals)
+  const span = (hi - lo) * buckets
+  const v = lo + (hash % span) / buckets
+  return Math.round(v * buckets) / buckets
+}
+
+/**
+ * Derive a deterministic AugmentPerfStat for an augment id. Same id →
+ * same numbers across calls and processes. Champions in arena pull augments
+ * from the same catalog; we deliberately don't vary stats per champion
+ * because that's an M1 limiter that should fail loudly rather than
+ * silently spread fake data.
+ */
+function deterministicStatsFor(augmentId: number, slot: 'mock' | 'cdr'): AugmentPerfStat {
+  const a = fnv1a32(augmentId ^ 0xa11ce)
+  const b = fnv1a32(augmentId ^ 0xb0b)
+  const c = fnv1a32(augmentId ^ 0xc0ffee)
+  const d = fnv1a32(augmentId ^ 0xdeadbeef)
+  return {
+    augmentId,
+    // placement lower-is-better, cover [1.5, 4.5]
+    averagePlacement: inRange(a, 1.5, 4.5, 2),
+    // first place rate, [0.05, 0.30]
+    firstPlaceRate: inRange(b, 0.05, 0.30, 4),
+    // pick rate, [0.005, 0.30]
+    pickRate: inRange(c, 0.005, 0.30, 4),
+    // sample size [100, 50000]
+    sampleSize: Math.round(inRange(d, 100, 50000, 0)),
+    // slot is internal — leaks only into tests/diagnostics
+    ...(slot === 'mock' ? {} : {}),
+  }
+}
+
 // Backing implementations ----------------------------------------------
 
 /**
- * The default source for now: returns an empty stats bundle but with the
- * full augment catalog embedded in metadata so downstream consumers can
- * still iterate the catalog. This is the seam M1's first iteration will
- * fill in without touching the rest of the app.
+ * The default source for now: returns deterministic mock stats based on
+ * the augment id. Same id → same numeric output across calls and runs.
  */
 function mockSource(): ArenaAugmentSource {
   return {
     id: 'mock',
-    label: 'Mock (no stats)',
+    label: 'Mock (deterministic stats, no real gameplay data)',
     async getStatsForChampion(_championId, _opts) {
+      const catalog = loadAugmentArenaDictionary()
       return {
         fetchedAt: new Date().toISOString(),
         source: 'mock',
-        records: [],
+        mock: true,
+        records: catalog.map(r => deterministicStatsFor(r.id, 'mock')),
       }
     },
   }
 }
 
 /**
- * Builds a source that derives whatever it can from the local
- * CommunityDragon-derived dictionary. The CDR file exposes names, ids,
- * rarity, icons — not placement stats — so for the M0/M1 boundary this
- * source is effectively the catalog. It is wired up here so that when
- * real placement data lands (later ticket) only this function's body
- * changes, not the call sites.
+ * Same shape as mock today, but labelled communitydragon so the UI knows
+ * to show "CDR catalog" until we attach real placement data. The seam is
+ * identical; only `source` and `mock` change. When T07+ attaches real
+ * stats only this function's body changes.
  */
 function communityDragonSource(): ArenaAugmentSource {
-  const catalog = loadAugmentArenaDictionary()
   return {
     id: 'communitydragon',
-    label: 'CommunityDragon catalog',
+    label: 'CommunityDragon catalog (stats are placeholders)',
     async getStatsForChampion(_championId, _opts) {
-      // Placement/perf data is not in CommunityDragon today. The M1
-      // adapter is responsible for that aggregation; this branch just
-      // declares that CDR is the chosen source.
+      const catalog = loadAugmentArenaDictionary()
       return {
         fetchedAt: new Date().toISOString(),
         source: 'communitydragon',
-        records: catalog.map(r => ({
-          augmentId: r.id,
-          averagePlacement: null,
-          firstPlaceRate: null,
-          pickRate: null,
-          sampleSize: null,
-        })),
+        mock: true,
+        records: catalog.map(r => deterministicStatsFor(r.id, 'cdr')),
       }
     },
   }
@@ -123,4 +173,36 @@ export function catalogAugmentIds(): number[] {
 
 export function describeAugment(id: number): ArenaAugmentRecord | undefined {
   return findAugmentById(id)
+}
+
+// Ranking helpers --------------------------------------------------------
+
+export type RankOrder = 'placement' | 'firstplace' | 'picks'
+
+const RANK_FIELD: Record<RankOrder, keyof Pick<AugmentPerfStat, 'averagePlacement' | 'firstPlaceRate' | 'pickRate'>> = {
+  placement: 'averagePlacement',
+  firstplace: 'firstPlaceRate',
+  picks: 'pickRate',
+}
+
+/**
+ * Sort a copy of `records` by the chosen ranking dimension. Tie-breaks
+ * by augmentId ascending. The input array is left untouched.
+ *
+ * - 'placement' sorts ascending (lower average placement is better).
+ * - 'firstplace' / 'picks' sort descending (higher rate is better).
+ */
+export function rankAugmentStats(records: AugmentPerfStat[], by: RankOrder): AugmentPerfStat[] {
+  const field = RANK_FIELD[by]
+  const dir = by === 'placement' ? 1 : -1
+  return records.slice().sort((a, b) => {
+    const av = a[field] as number | null
+    const bv = b[field] as number | null
+    // Nulls always sort last regardless of direction.
+    if (av === null && bv === null) return a.augmentId - b.augmentId
+    if (av === null) return 1
+    if (bv === null) return -1
+    if (av === bv) return a.augmentId - b.augmentId
+    return dir * (av - bv)
+  })
 }

@@ -7,8 +7,10 @@ export {
   type ArenaAugmentSource,
   type AugmentPerfStat,
   type AugmentStatsBundle,
+  type RankOrder,
   type RarityTier,
   selectAugmentSource,
   catalogAugmentIds,
   describeAugment,
+  rankAugmentStats,
 } from './interface.ts'
