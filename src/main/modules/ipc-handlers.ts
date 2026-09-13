@@ -906,6 +906,7 @@ export function registerIpcHandlers(_isDev: boolean): void {
                     averagePlacement: r.averagePlacement,
                     firstPlaceRate: r.firstPlaceRate,
                     pickRate: r.pickRate,
+                    winRate: r.winRate,
                     sampleSize: r.sampleSize,
                 }
             }).filter(r => r !== null)
@@ -914,6 +915,7 @@ export function registerIpcHandlers(_isDev: boolean): void {
                 placement: rankAugmentStats(records as never, 'placement').slice(0, limit),
                 firstplace: rankAugmentStats(records as never, 'firstplace').slice(0, limit),
                 picks: rankAugmentStats(records as never, 'picks').slice(0, limit),
+                winrate: rankAugmentStats(records as never, 'winrate').slice(0, limit),
             }
 
             logger.info('[arena-augment] stats served', {

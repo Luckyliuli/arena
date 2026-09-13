@@ -1,19 +1,13 @@
-// Public surface for OP.GG arena data adapter.
-
+export { opggSource, type OpggSourceOptions } from './source.ts'
 export {
-  parseOpggAugmentsHtml,
-  type OpggArenaRarity,
-  type OpggArenaRecord,
-} from './parser.ts'
-
+  extractOpggAugments,
+  findAugmentTierMap,
+  type OpggAugmentRecord,
+  type OpggRarity,
+} from './rscParser.ts'
 export {
-  onlineOpggHtmlFetcher,
   offlineOpggHtmlFetcher,
+  onlineOpggHtmlFetcher,
   type ArenaAugmentHtmlFetcher,
   type OnlineOpggFetcherOptions,
 } from './fetcher.ts'
-
-export {
-  opggSource,
-  type OpggSourceOptions,
-} from './source.ts'

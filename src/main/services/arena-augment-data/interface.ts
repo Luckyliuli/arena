@@ -22,6 +22,21 @@ export type AugmentPerfStat = {
   averagePlacement: number | null  // 1..8, lower is better
   firstPlaceRate: number | null    // 0..1
   pickRate: number | null          // 0..1
+  /**
+   * Third-party (OP.GG) arena "win rate", carried verbatim — NOT one of
+   * our own metrics.
+   *
+   * OP.GG's arena pages expose only `pick_rate` / `win_rate` / `play`
+   * per augment; they do not publish an average placement or a
+   * first-place rate. Observed values sit in 45–58%, and in an 8-team
+   * lobby the median finish rate is 50%, so this figure is consistent
+   * with a *top-4 finish rate*. That is an inference, not a definition:
+   * we therefore never fold it into `averagePlacement` or
+   * `firstPlaceRate`, and the UI must attribute it to OP.GG rather than
+   * present it as a domain metric. See CONTEXT.md (`胜率` is deliberately
+   * not a domain term in this project).
+   */
+  winRate: number | null
   sampleSize: number | null        // raw game count
 }
 
@@ -107,6 +122,7 @@ function deterministicStatsFor(augmentId: number, slot: 'mock' | 'cdr'): Augment
   const b = fnv1a32(augmentId ^ 0xb0b)
   const c = fnv1a32(augmentId ^ 0xc0ffee)
   const d = fnv1a32(augmentId ^ 0xdeadbeef)
+  const e = fnv1a32(augmentId ^ 0x5eed)
   return {
     augmentId,
     // placement lower-is-better, cover [1.5, 4.5]
@@ -115,6 +131,8 @@ function deterministicStatsFor(augmentId: number, slot: 'mock' | 'cdr'): Augment
     firstPlaceRate: inRange(b, 0.05, 0.30, 4),
     // pick rate, [0.005, 0.30]
     pickRate: inRange(c, 0.005, 0.30, 4),
+    // third-party win rate, [0.40, 0.60] to mirror OP.GG's observed band
+    winRate: inRange(e, 0.4, 0.6, 4),
     // sample size [100, 50000]
     sampleSize: Math.round(inRange(d, 100, 50000, 0)),
     // slot is internal — leaks only into tests/diagnostics
@@ -180,12 +198,16 @@ export function describeAugment(id: number): ArenaAugmentRecord | undefined {
 
 // Ranking helpers --------------------------------------------------------
 
-export type RankOrder = 'placement' | 'firstplace' | 'picks'
+export type RankOrder = 'placement' | 'firstplace' | 'picks' | 'winrate'
 
-const RANK_FIELD: Record<RankOrder, keyof Pick<AugmentPerfStat, 'averagePlacement' | 'firstPlaceRate' | 'pickRate'>> = {
+const RANK_FIELD: Record<
+  RankOrder,
+  keyof Pick<AugmentPerfStat, 'averagePlacement' | 'firstPlaceRate' | 'pickRate' | 'winRate'>
+> = {
   placement: 'averagePlacement',
   firstplace: 'firstPlaceRate',
   picks: 'pickRate',
+  winrate: 'winRate',
 }
 
 /**
@@ -193,7 +215,8 @@ const RANK_FIELD: Record<RankOrder, keyof Pick<AugmentPerfStat, 'averagePlacemen
  * by augmentId ascending. The input array is left untouched.
  *
  * - 'placement' sorts ascending (lower average placement is better).
- * - 'firstplace' / 'picks' sort descending (higher rate is better).
+ * - 'firstplace' / 'picks' / 'winrate' sort descending (higher is
+ *   better).
  */
 export function rankAugmentStats(records: AugmentPerfStat[], by: RankOrder): AugmentPerfStat[] {
   const field = RANK_FIELD[by]

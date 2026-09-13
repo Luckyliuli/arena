@@ -212,6 +212,12 @@ export type ArenaAugmentPerfStat = {
   averagePlacement: number | null
   firstPlaceRate: number | null
   pickRate: number | null
+  /**
+   * Third-party (OP.GG) arena win-rate figure, carried verbatim. Not one
+   * of this project's own metrics — see
+   * src/main/services/arena-augment-data/interface.ts for the full note.
+   */
+  winRate: number | null
   sampleSize: number | null
 }
 
@@ -236,15 +242,17 @@ export type ArenaAugmentLeaderboardRow = {
   averagePlacement: number | null
   firstPlaceRate: number | null
   pickRate: number | null
+  winRate: number | null
   sampleSize: number | null
 }
 
-export type ArenaAugmentRankOrder = 'placement' | 'firstplace' | 'picks'
+export type ArenaAugmentRankOrder = 'placement' | 'firstplace' | 'picks' | 'winrate'
 
 export type ArenaAugmentRankedSet = {
   placement: ArenaAugmentLeaderboardRow[]
   firstplace: ArenaAugmentLeaderboardRow[]
   picks: ArenaAugmentLeaderboardRow[]
+  winrate: ArenaAugmentLeaderboardRow[]
 }
 
 export interface ArenaAugmentStatsRequest {

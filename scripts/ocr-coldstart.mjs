@@ -7,13 +7,13 @@
 //   node scripts/ocr-coldstart.mjs                                # default spikes
 //   node scripts/ocr-coldstart.mjs --image <path>                # one image
 //   node scripts/ocr-coldstart.mjs --out <path>                  # write JSON report
-//   node scripts/ocr-coldstart.mjs --write-sample                # also rank top-10 by placement / firstplace / picks
+//   node scripts/ocr-coldstart.mjs --write-sample                # also rank top-10 by placement / firstplace / picks / winrate
 //
 // Output structure (also echoed to stdout):
 //   {
 //     summary: { images: N, cardSlots: M, exactMatches: K, fuzzyMatches: F, unmatched: U },
 //     perImage: [{ file, cardSlots: [{ index, transcript, matched: { id, name, distance, confidence } }] }]
-//     sample?: { source, mock, topBy: { placement, firstplace, picks } }
+//     sample?: { source, mock, topBy: { placement, firstplace, picks, winrate } }
 //   }
 //
 // Decision criterion (issues/04):
@@ -176,6 +176,7 @@ function buildSample(source, topN = 10) {
       placement: rankAugmentStats(source, 'placement').slice(0, topN).map(s => decorate(s)),
       firstplace: rankAugmentStats(source, 'firstplace').slice(0, topN).map(s => decorate(s)),
       picks: rankAugmentStats(source, 'picks').slice(0, topN).map(s => decorate(s)),
+      winrate: rankAugmentStats(source, 'winrate').slice(0, topN).map(s => decorate(s)),
     },
   }
   function decorate(stat) {
@@ -187,6 +188,7 @@ function buildSample(source, topN = 10) {
       averagePlacement: stat.averagePlacement,
       firstPlaceRate: stat.firstPlaceRate,
       pickRate: stat.pickRate,
+      winRate: stat.winRate,
       sampleSize: stat.sampleSize,
     }
   }
@@ -263,6 +265,7 @@ async function main() {
           + ' placement=' + r.averagePlacement
           + ' firstplace=' + (r.firstPlaceRate ?? 0).toFixed(3)
           + ' picks=' + (r.pickRate ?? 0).toFixed(3)
+          + ' winrate=' + (r.winRate ?? 0).toFixed(3)
           + ' sampleSize=' + r.sampleSize)
       }
     }

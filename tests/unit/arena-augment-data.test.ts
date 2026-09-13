@@ -13,10 +13,11 @@ import {
   selectAugmentSource,
 } from '../../src/main/services/arena-augment-data/index.ts'
 
-function isStatFilled(stat: { averagePlacement: unknown, firstPlaceRate: unknown, pickRate: unknown, sampleSize: unknown }): boolean {
+function isStatFilled(stat: { averagePlacement: unknown, firstPlaceRate: unknown, pickRate: unknown, winRate: unknown, sampleSize: unknown }): boolean {
   return stat.averagePlacement !== null
     && stat.firstPlaceRate !== null
     && stat.pickRate !== null
+    && stat.winRate !== null
     && stat.sampleSize !== null
 }
 
@@ -70,9 +71,9 @@ describe('arena augment data adapter', () => {
 
 describe('rankAugmentStats', () => {
   const sample = [
-    { augmentId: 1, averagePlacement: 4.0, firstPlaceRate: 0.10, pickRate: 0.20, sampleSize: 1000 },
-    { augmentId: 2, averagePlacement: 2.0, firstPlaceRate: 0.30, pickRate: 0.05, sampleSize: 500 },
-    { augmentId: 3, averagePlacement: 3.0, firstPlaceRate: 0.20, pickRate: 0.10, sampleSize: 800 },
+    { augmentId: 1, averagePlacement: 4.0, firstPlaceRate: 0.10, pickRate: 0.20, winRate: 0.48, sampleSize: 1000 },
+    { augmentId: 2, averagePlacement: 2.0, firstPlaceRate: 0.30, pickRate: 0.05, winRate: 0.58, sampleSize: 500 },
+    { augmentId: 3, averagePlacement: 3.0, firstPlaceRate: 0.20, pickRate: 0.10, winRate: 0.53, sampleSize: 800 },
   ]
 
   it('sorts ascending by averagePlacement by default', () => {
@@ -90,6 +91,20 @@ describe('rankAugmentStats', () => {
     expect(ranked.map(r => r.augmentId)).toEqual([1, 3, 2])
   })
 
+  it('sorts descending by the third-party winRate when asked', () => {
+    const ranked = rankAugmentStats(sample as never, 'winrate')
+    expect(ranked.map(r => r.augmentId)).toEqual([2, 3, 1])
+  })
+
+  it('sorts null metrics last regardless of direction', () => {
+    const withNulls = [
+      { augmentId: 1, averagePlacement: null, firstPlaceRate: null, pickRate: 0.10, winRate: null, sampleSize: null },
+      { augmentId: 2, averagePlacement: 3.0, firstPlaceRate: null, pickRate: null, winRate: 0.55, sampleSize: null },
+    ]
+    expect(rankAugmentStats(withNulls as never, 'placement').map(r => r.augmentId)).toEqual([2, 1])
+    expect(rankAugmentStats(withNulls as never, 'winrate').map(r => r.augmentId)).toEqual([2, 1])
+  })
+
   it('does not mutate the input array', () => {
     const original = sample.map(r => r.augmentId)
     rankAugmentStats(sample as never, 'placement')
@@ -98,9 +113,9 @@ describe('rankAugmentStats', () => {
 
   it('breaks ties by augmentId ascending', () => {
     const tied = [
-      { augmentId: 30, averagePlacement: 3.0, firstPlaceRate: 0.15, pickRate: 0.10, sampleSize: 100 },
-      { augmentId: 10, averagePlacement: 3.0, firstPlaceRate: 0.15, pickRate: 0.10, sampleSize: 100 },
-      { augmentId: 20, averagePlacement: 3.0, firstPlaceRate: 0.15, pickRate: 0.10, sampleSize: 100 },
+      { augmentId: 30, averagePlacement: 3.0, firstPlaceRate: 0.15, pickRate: 0.10, winRate: 0.5, sampleSize: 100 },
+      { augmentId: 10, averagePlacement: 3.0, firstPlaceRate: 0.15, pickRate: 0.10, winRate: 0.5, sampleSize: 100 },
+      { augmentId: 20, averagePlacement: 3.0, firstPlaceRate: 0.15, pickRate: 0.10, winRate: 0.5, sampleSize: 100 },
     ]
     const ranked = rankAugmentStats(tied as never, 'placement')
     expect(ranked.map(r => r.augmentId)).toEqual([10, 20, 30])

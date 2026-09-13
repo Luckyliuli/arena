@@ -1,58 +1,65 @@
-// OP.GG Arena source — implements ArenaAugmentSource seam.
+// OP.GG Arena source — implements the ArenaAugmentSource seam.
 //
-// Bridging:
-//   HTML from ArenaAugmentHtmlFetcher
-//     -> parseOpggAugmentsHtml() -> OpggArenaRecord[]
-//     -> join with shared/augment-dictionary (T02) by display name (zh first,
-//        then en as fallback; OP.GG may use a different slug system later)
-//     -> emit AugmentPerfStat[]
+//   championId (LCU/Riot numeric id)
+//     -> shared/champion-map  -> OP.GG URL slug (`Annie`, `MissFortune`)
+//     -> ArenaAugmentHtmlFetcher (offline fixture or live HTTPS)
+//     -> extractOpggAugments (RSC payload parser)
+//     -> keep only rows whose id exists in the CDR dictionary
+//     -> AugmentPerfStat[]
 //
-// The id-mapping by display-name is deliberately forgiving: OP.GG Arena
-// uses slugs ("prismatic_dawnbringer") while CDR uses numeric ids. We
-// don't lock this down until we have a real fixture (i.e. once Playwright
-// is wired in — see docs/adr/0005-opgg-scraper-mvp.md).
+// Field mapping (OP.GG -> us):
+//   pick_rate -> pickRate            (percent -> fraction)
+//   win_rate  -> winRate             (third-party figure; see interface.ts)
+//   play      -> sampleSize
+//   averagePlacement / firstPlaceRate stay null — OP.GG does not publish
+//   either on the augment card, and we do not synthesise them.
+//
+// OP.GG's numeric augment `id` equals the CommunityDragon id (verified
+// 41/41 on the Annie page by both id and zh name), so the join is exact;
+// name lookup is only a defensive fallback for unfamiliar spellings.
 
 import {
   loadAugmentArenaDictionary,
   type ArenaAugmentRecord,
 } from '../../../../shared/augment-dictionary.ts'
-import type { ArenaAugmentSource, AugmentStatsBundle } from '../interface.ts'
-import { parseOpggAugmentsHtml } from './parser.ts'
-import {
-  onlineOpggHtmlFetcher,
-  type ArenaAugmentHtmlFetcher,
-} from './fetcher.ts'
+import { findChampionSlug } from '../../../../shared/champion-map.ts'
+import type { ArenaAugmentSource, AugmentPerfStat, AugmentStatsBundle } from '../interface.ts'
+import { extractOpggAugments, type OpggAugmentRecord } from './rscParser.ts'
+import { onlineOpggHtmlFetcher, type ArenaAugmentHtmlFetcher } from './fetcher.ts'
 
 export interface OpggSourceOptions {
   fetcher?: ArenaAugmentHtmlFetcher
-  /** When `fetcher` isn't set and `championKey` is unrecognised, the
-   *  adapter still falls back to this default champion (an empty fixture
-   *  resolves to records=[]). Avoid hard-coding a specific real champion
-   *  in the production flow. */
-  defaultChampionKey?: string
+  /** Used only when no championId is supplied (ad-hoc runs / tests). */
+  defaultChampionSlug?: string
 }
 
 export function opggSource(opts: OpggSourceOptions = {}): ArenaAugmentSource {
   const fetcher = opts.fetcher ?? onlineOpggHtmlFetcher()
-  const defaultChampionKey = opts.defaultChampionKey ?? 'leona'
-  const label = opts.fetcher
-    ? 'OP.GG Arena (custom fetcher)'
-    : 'OP.GG Arena (online HTTPS — currently returns SSR skeleton, parser yields no rows)'
+  const fallbackSlug = opts.defaultChampionSlug ?? null
+  const label = opts.fetcher ? 'OP.GG Arena (custom fetcher)' : 'OP.GG Arena (live HTTPS)'
 
   return {
     id: 'opgg',
     label,
-    async getStatsForChampion(_championId: number, _opts?: { patch?: string }): Promise<AugmentStatsBundle> {
+    async getStatsForChampion(championId: number): Promise<AugmentStatsBundle> {
+      const slug = findChampionSlug(championId) ?? fallbackSlug
+      if (!slug) return emptyBundle()
+
       let html: string
       try {
-        html = await fetcher(defaultChampionKey)
+        html = await fetcher(slug)
       } catch {
         return emptyBundle()
       }
-      const parsed = parseOpggAugmentsHtml(html)
+
+      const parsed = extractOpggAugments(html)
       if (parsed.length === 0) return emptyBundle()
+
       const dict = loadAugmentArenaDictionary()
-      const records = parsed.map((r) => enrich(r, dict))
+      const records = parsed
+        .map((r) => toPerfStat(r, dict))
+        .filter((r): r is AugmentPerfStat => r !== null && r.augmentId !== 0)
+
       return {
         fetchedAt: new Date().toISOString(),
         source: 'opgg',
@@ -72,25 +79,15 @@ function emptyBundle(): AugmentStatsBundle {
   }
 }
 
-function enrich(
-  r: ReturnType<typeof parseOpggAugmentsHtml>[number],
-  dict: ArenaAugmentRecord[]
-): AugmentStatsBundle['records'][number] {
-  const match = dictMatch(r.name, dict)
-  const top4 = r.top4Rate
+function toPerfStat(r: OpggAugmentRecord, dict: readonly ArenaAugmentRecord[]): AugmentPerfStat | null {
+  const match = dict.find((d) => d.id === r.id) ?? dict.find((d) => d.displayName.zh === r.name || d.displayName.en === r.name)
+  if (!match) return null
   return {
-    augmentId: match?.id ?? 0,
-    // OP.GG doesn't expose placement directly. Use top4Rate as a soft
-    // proxy to keep the column alive in the M2 UI; nullify when the data
-    // isn't present.
-    averagePlacement: top4 != null ? Math.max(1, Math.min(8, 1 + 7 * (1 - top4))) : null,
-    firstPlaceRate: r.top4Rate,
+    augmentId: match.id,
+    averagePlacement: null,
+    firstPlaceRate: null,
     pickRate: r.pickRate,
+    winRate: r.winRate,
     sampleSize: r.playCount,
   }
-}
-
-function dictMatch(name: string, dict: ArenaAugmentRecord[]): ArenaAugmentRecord | undefined {
-  if (!name) return undefined
-  return dict.find((d) => d.displayName.zh === name || d.displayName.en === name)
 }

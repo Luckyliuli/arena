@@ -1,91 +1,142 @@
-// T08: OP.GG Arena augment source — adapter side.
+// T08b: OP.GG Arena augment source — real RSC payload path.
 //
-// These tests cover the pieces we can validate offline:
-//  - OpggParser turns a fixture <script type="application/json"> into records
-//  - OpggParser returns [] when no data island is present (the real-life
-//    case today, because OP.GG renders the data client-side and the SSR
-//    HTML fixture we saved has no island)
-//  - the opggSource() builder accepts an optional fetcher override; we
-//    hand it an in-memory fetcher that loads fixtures/opgg/ so the whole
-//    chain is exercised with zero network traffic
+// OP.GG's zh-cn augments page is a Next.js App-Router SPA: the augment
+// data arrives inside an RSC payload chunk
+// (`self.__next_f.push([1,"<hexId>:<json>"])`), not a JSON island.
+// These tests exercise that path offline against a small synthetic
+// fixture that mirrors the real payload shape, plus a live-free walk
+// through the source seam.
 //
-// Going from "real OP.GG SSR HTML" to "parser actually finds the data"
-// needs Playwright. That work is documented in
-// docs/adr/0005-opgg-scraper-mvp.md and tracked separately.
+// The 600KB × 5 real pages used to validate this during development are
+// deliberately NOT in the repo (third-party copyrighted content); they
+// live in .workbuddy/opgg-real/ and are used by ad-hoc scripts only.
 
 import { describe, expect, it } from 'vitest'
+import { readFile } from 'node:fs/promises'
 import {
-  parseOpggAugmentsHtml,
+  extractOpggAugments,
+  findAugmentTierMap,
   offlineOpggHtmlFetcher,
+  onlineOpggHtmlFetcher,
   opggSource,
 } from '../../src/main/services/arena-augment-data/opgg/index.ts'
+import { findChampionSlug } from '../../src/shared/champion-map.ts'
 
-// Hand-crafted fixture: arena-leona-augments.html. The parser
-// recognizes the <script type="application/json" id="__OPGG_ARENA_AUGMENTS__">
-// island and emits 4 records.
 const FIXTURES = 'tests/fixtures/opgg'
+const ANNIE_FIXTURE = `${FIXTURES}/arena-annie-augments.html`
 
-describe('parseOpggAugmentsHtml', () => {
-  it('returns [] when the HTML has no data island', async () => {
-    const empty = `<!DOCTYPE html><html><body><h1>Empty OP.GG SSR</h1></body></html>`
-    expect(parseOpggAugmentsHtml(empty)).toEqual([])
+async function loadAnnie(): Promise<string> {
+  return readFile(ANNIE_FIXTURE, 'utf8')
+}
+
+describe('extractOpggAugments (RSC payload)', () => {
+  it('returns [] when the page carries no augment chunk', () => {
+    const empty = '<!DOCTYPE html><html><body><h1>Empty</h1></body></html>'
+    expect(extractOpggAugments(empty)).toEqual([])
   })
 
-  it('extracts records from a <script id="__OPGG_ARENA_AUGMENTS__"> island', async () => {
-    const fs = await import('node:fs/promises')
-    const html = await fs.readFile(`${FIXTURES}/arena-leona-augments.html`, 'utf8')
-    const records = parseOpggAugmentsHtml(html)
-    expect(records.length).toBe(4)
-    const first = records[0]
-    expect(first.name).toBe('曙光女神的觉醒')
-    expect(first.rarityTier).toBe('prismatic')
-    expect(first.tierRank).toBe(1)
-    expect(first.pickRate).toBeCloseTo(0.182, 4)
-    expect(first.winRate).toBeCloseTo(0.731, 4)
-    expect(first.top4Rate).toBeCloseTo(0.812, 4)
-    expect(first.playCount).toBe(48721)
-    // pre-DPR-9001 augments: tierRank should be respected as-is (smaller = stronger).
-    expect(records[3].tierRank).toBe(41)
+  it('returns [] when the RSC push chunk is malformed', () => {
+    const broken = '<script>self.__next_f.push([1,"59:[{\\"data\\":{")</script>'
+    expect(() => extractOpggAugments(broken)).not.toThrow()
+    expect(extractOpggAugments(broken)).toEqual([])
   })
 
-  it('prefers the json island over an RSC chunk containing empty augments', async () => {
-    const fs = await import('node:fs/promises')
-    const html = await fs.readFile(`${FIXTURES}/arena-leona-augments.html`, 'utf8')
-    const records = parseOpggAugmentsHtml(html)
-    expect(records.length).toBe(4)
+  it('decodes the chunk-id prefix and yields every record across tiers', async () => {
+    const html = await loadAnnie()
+    const records = extractOpggAugments(html)
+    // 2 silver + 2 gold + 1 prismatic in the fixture
+    expect(records.length).toBe(5)
+    expect(records.map(r => r.id).sort((a, b) => a - b)).toEqual([48, 65, 97, 205, 999999])
   })
 
-  it('resists malformed JSON in the island without throwing', () => {
-    const html = `<script type="application/json" id="__OPGG_ARENA_AUGMENTS__">{"augments":[{"name":</script>`
-    expect(() => parseOpggAugmentsHtml(html)).not.toThrow()
-    expect(parseOpggAugmentsHtml(html)).toEqual([])
+  it('maps OP.GG percent fields onto fractions and integers', async () => {
+    const html = await loadAnnie()
+    const adapt = extractOpggAugments(html).find(r => r.id === 205)
+    expect(adapt).toBeDefined()
+    expect(adapt!.name).toBe('物理转魔法')
+    expect(adapt!.pickRate).toBeCloseTo(0.1638, 4)
+    expect(adapt!.winRate).toBeCloseTo(0.574, 4)
+    expect(adapt!.playCount).toBe(1920)
+    expect(adapt!.description).toContain('法术强度')
+    expect(adapt!.imageUrl).toContain('adapt_large.png')
+  })
+
+  it('derives rarity from the OP.GG tier bucket (1=silver, 4=gold, 8=prismatic)', async () => {
+    const html = await loadAnnie()
+    const byId = new Map(extractOpggAugments(html).map(r => [r.id, r.rarity]))
+    expect(byId.get(205)).toBe('silver')
+    expect(byId.get(97)).toBe('silver')
+    expect(byId.get(65)).toBe('gold')
+    expect(byId.get(48)).toBe('prismatic')
+  })
+
+  it('findAugmentTierMap returns the tier map itself, not the { data } wrapper', async () => {
+    const html = await loadAnnie()
+    const map = findAugmentTierMap(html)
+    expect(map).not.toBeNull()
+    expect(Object.keys(map!).sort()).toEqual(['1', '4', '8'])
   })
 })
 
-describe('opggSource (offline fetcher)', () => {
-  it('returns a bundle with source="opgg" and mock=false when the JSON island exists', async () => {
-    const fetcher = offlineOpggHtmlFetcher(FIXTURES)
-    const src = opggSource({ fetcher })
-    const bundle = await src.getStatsForChampion(0, { patch: '16.18' })
+describe('opggSource (offline fixture, real payload shape)', () => {
+  it('resolves championId -> OP.GG slug -> fixture and returns real rows', async () => {
+    const src = opggSource({ fetcher: offlineOpggHtmlFetcher(FIXTURES) })
+    // championId 1 is Annie, whose slug the offline fetcher resolves to
+    // arena-annie-augments.html
+    const bundle = await src.getStatsForChampion(1)
     expect(src.id).toBe('opgg')
     expect(bundle.source).toBe('opgg')
     expect(bundle.mock).toBe(false)
-    // The mock HTML does not include an OP.GG-champion id; the parser is
-    // currently id-less so we expect records to flow through. Future id
-    // mapping will be done when OP.GG exposes real API IDs.
-    expect(bundle.records.length).toBe(4)
+    // The 999999 row is absent from the CDR dictionary and must be dropped.
+    expect(bundle.records.map(r => r.augmentId).sort((a, b) => a - b)).toEqual([48, 65, 97, 205])
   })
 
-  it('returns records=[] (without throwing) when the fetcher cannot read the HTML', async () => {
+  it('maps OP.GG fields to AugmentPerfStat without inventing placement data', async () => {
+    const src = opggSource({ fetcher: offlineOpggHtmlFetcher(FIXTURES) })
+    const bundle = await src.getStatsForChampion(1)
+    const row = bundle.records.find(r => r.augmentId === 205)
+    expect(row).toBeDefined()
+    expect(row!.pickRate).toBeCloseTo(0.1638, 4)
+    expect(row!.winRate).toBeCloseTo(0.574, 4)
+    expect(row!.sampleSize).toBe(1920)
+    // OP.GG publishes neither of these on the augment card; we must not
+    // synthesise them.
+    expect(row!.averagePlacement).toBeNull()
+    expect(row!.firstPlaceRate).toBeNull()
+  })
+
+  it('returns records=[] (without throwing) when the fixture is missing', async () => {
     const src = opggSource({ fetcher: offlineOpggHtmlFetcher('tests/fixtures/does-not-exist') })
-    const bundle = await src.getStatsForChampion(0)
+    const bundle = await src.getStatsForChampion(1)
     expect(bundle.source).toBe('opgg')
     expect(bundle.records).toEqual([])
   })
 
-  it('uses a default online fetcher when no fetcher is supplied', () => {
-    const src = opggSource()
+  it('returns records=[] when the champion id has no slug and no fallback', async () => {
+    const src = opggSource({ fetcher: offlineOpggHtmlFetcher(FIXTURES) })
+    const bundle = await src.getStatsForChampion(999999)
+    expect(bundle.records).toEqual([])
+  })
+
+  it('builds the live OP.GG URL shape without issuing a request', () => {
+    const fetcher = onlineOpggHtmlFetcher({ locale: 'zh-cn', timeoutMs: 1 })
+    expect(typeof fetcher).toBe('function')
+    const src = opggSource({ fetcher })
     expect(src.id).toBe('opgg')
     expect(typeof src.getStatsForChampion).toBe('function')
+  })
+})
+
+describe('champion map', () => {
+  it('maps numeric champion ids onto OP.GG slugs', () => {
+    expect(findChampionSlug(1)).toBe('Annie')
+    // Multi-word slugs must survive verbatim (this is why the fetcher no
+    // longer re-cases the slug).
+    expect(findChampionSlug(21)).toBe('MissFortune')
+    expect(findChampionSlug(64)).toBe('LeeSin')
+  })
+
+  it('returns undefined for an unknown champion id', () => {
+    expect(findChampionSlug(999999)).toBeUndefined()
   })
 })

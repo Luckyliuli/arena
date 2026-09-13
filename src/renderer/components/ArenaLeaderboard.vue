@@ -82,12 +82,14 @@ const rankOptions: { id: ArenaAugmentRankOrder, titleKey: string }[] = [
   { id: 'placement', titleKey: 'arenaLeaderboard.rankPlacement' },
   { id: 'firstplace', titleKey: 'arenaLeaderboard.rankFirstplace' },
   { id: 'picks', titleKey: 'arenaLeaderboard.rankPicks' },
+  { id: 'winrate', titleKey: 'arenaLeaderboard.rankWinrate' },
 ]
 
 const RANK_TITLE_KEYS: Record<ArenaAugmentRankOrder, string> = {
   placement: 'arenaLeaderboard.metricPlacement',
   firstplace: 'arenaLeaderboard.metricFirstplace',
   picks: 'arenaLeaderboard.metricPicks',
+  winrate: 'arenaLeaderboard.metricWinrate',
 }
 
 const RARITY_LABEL_KEYS: Record<ArenaAugmentRarity, string> = {
@@ -98,7 +100,12 @@ const RARITY_LABEL_KEYS: Record<ArenaAugmentRarity, string> = {
 }
 
 const bundle = ref<ArenaAugmentStatsBundle | null>(null)
-const ranked = ref<{ placement: ArenaAugmentLeaderboardRow[]; firstplace: ArenaAugmentLeaderboardRow[]; picks: ArenaAugmentLeaderboardRow[] }>({ placement: [], firstplace: [], picks: [] })
+const ranked = ref<Record<ArenaAugmentRankOrder, ArenaAugmentLeaderboardRow[]>>({
+  placement: [],
+  firstplace: [],
+  picks: [],
+  winrate: [],
+})
 const sourceLabel = ref<string>('')
 const loading = ref<boolean>(false)
 const error = ref<string | null>(null)
@@ -123,6 +130,8 @@ function formatPrimary(row: ArenaAugmentLeaderboardRow): string {
       return row.firstPlaceRate == null ? '-' : (row.firstPlaceRate * 100).toFixed(1) + '%';
     case 'picks':
       return row.pickRate == null ? '-' : (row.pickRate * 100).toFixed(1) + '%';
+    case 'winrate':
+      return row.winRate == null ? '-' : (row.winRate * 100).toFixed(1) + '%';
   }
 }
 
