@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "node scripts/dev-electron.mjs",
     "prepare:client-data": "node scripts/fetch-client-data.mjs",
+    "fetch:arena-augments": "node scripts/fetch-arena-augments.mjs",
+    "fetch:arena-augments:check": "node scripts/fetch-arena-augments.mjs --check",
     "build": "electron-vite build",
     "pack": "node scripts/pack-electron.mjs",
     "start": "electron .",
