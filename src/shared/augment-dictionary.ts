@@ -22,7 +22,7 @@ export type ArenaAugmentRecord = {
 
 const DEFAULT_RELATIVE = path.join('resources', 'augments-arena.json')
 
-function resolvePath(rel) {
+function resolvePath(rel: string): string {
   // Resolve against the arena project root. The dictionary file lives
   // at arena/resources/augments-arena.json regardless of where the
   // caller sits in the source tree. relative to src/shared/ we need
