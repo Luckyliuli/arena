@@ -9,30 +9,7 @@ import logger from '../../modules/logger.ts'
 import { getChampionMonitorState, rememberChampionId } from '../../modules/champion-monitor-state.ts'
 import { getLCUServiceInstance } from './lcu-service.ts'
 import { ChampionIdResult, ChampSelectSnapshot } from './types.ts'
-import {
-  collectAramCandidateChampionIds,
-  createEmptyAramBenchRecommendation,
-  getAramBenchRecommendation,
-} from '../aram/bench-recommendation.ts'
 import { trustedIpcMain as ipcMain } from '../../security/trusted-ipc.ts'
-
-const LCU_READ_TIMEOUT_MS = 8 * 1000
-let lastAramBenchRecommendationLogSignature = ''
-
-const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
-  let timeout: NodeJS.Timeout | null = null
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeout = setTimeout(() => reject(new Error(message)), timeoutMs)
-  })
-
-  try {
-    return await Promise.race([promise, timeoutPromise])
-  } finally {
-    if (timeout) {
-      clearTimeout(timeout)
-    }
-  }
-}
 
 const getLcuServiceFromStore = async () => {
   const service = getLCUServiceInstance()
@@ -46,47 +23,6 @@ const getLcuServiceFromStore = async () => {
       ? null
       : '未从运行中的客户端发现 LCU',
   }
-}
-
-const loadChampionStatsForRecommendation = async (
-  championIds: number[]
-): Promise<Record<string, any>> => {
-  if (!championIds.length) {
-    return {}
-  }
-
-  const { loadChampionStats, loadChampionName } = await import('../../data-loader.ts')
-  const entries = await Promise.all(
-    championIds.map(async (championId) => {
-      try {
-        const [stats, championName] = await Promise.all([
-          loadChampionStats(championId),
-          loadChampionName(championId),
-        ])
-
-        return [
-          String(championId),
-          {
-            ...stats,
-            ...championName,
-            championId,
-          },
-        ] as const
-      } catch (error) {
-        const err = error as Error
-        logger.warn(`[LCU] Failed to load ARAM stats for champion ${championId}:`, err.message)
-        return [
-          String(championId),
-          {
-            championId,
-            nameCN: `英雄 ${championId}`,
-          },
-        ] as const
-      }
-    })
-  )
-
-  return Object.fromEntries(entries)
 }
 
 /**
@@ -151,79 +87,6 @@ export function registerLCUIpcHandlers(): void {
       success: true,
       snapshot,
       error: snapshot.status === 'ready' ? null : snapshot.reason,
-    }
-  })
-
-  ipcMain.handle('lcu-get-aram-bench-recommendation', async () => {
-    const startedAt = Date.now()
-    logger.debug('[LCU] ARAM bench recommendation requested')
-
-    const { service, error } = await getLcuServiceFromStore()
-    if (!service) {
-      return {
-        success: true,
-        recommendation: createEmptyAramBenchRecommendation(error || 'lcu-unavailable'),
-        error,
-      }
-    }
-
-    try {
-      const snapshot = await withTimeout(
-        service.getChampSelectSnapshot(),
-        LCU_READ_TIMEOUT_MS,
-        `LCU 选人快照读取超过 ${LCU_READ_TIMEOUT_MS / 1000} 秒`
-      )
-      const championIds = collectAramCandidateChampionIds(snapshot)
-      const championStatsById = await loadChampionStatsForRecommendation(championIds)
-      const recommendation = getAramBenchRecommendation(snapshot, championStatsById)
-
-      if (snapshot.selfChampionId) {
-        rememberChampionId(snapshot.selfChampionId)
-      }
-
-      const summary = {
-        status: recommendation.status,
-        snapshotStatus: snapshot.status,
-        selfChampionId: snapshot.selfChampionId,
-        benchChampionIds: snapshot.benchChampions.map((champion) => champion.championId),
-        candidateChampionIds: recommendation.candidates?.map((candidate) => candidate.championId) || [],
-        candidateCount: recommendation.candidates?.length || 0,
-        durationMs: Date.now() - startedAt,
-      }
-
-      const recommendationLogSignature = [
-        summary.status,
-        summary.selfChampionId || 'none',
-        summary.benchChampionIds.join(','),
-        summary.candidateChampionIds.join(','),
-      ].join(':')
-      if (recommendationLogSignature !== lastAramBenchRecommendationLogSignature) {
-        lastAramBenchRecommendationLogSignature = recommendationLogSignature
-        logger.info('[LCU] ARAM bench recommendation completed', summary)
-      } else {
-        logger.debug('[LCU] ARAM bench recommendation completed', summary)
-      }
-
-      return {
-        success: true,
-        snapshot,
-        recommendation,
-        error: recommendation.status === 'ready' || recommendation.status === 'no-bench'
-          ? null
-          : recommendation.reason,
-      }
-    } catch (error) {
-      const err = error as Error
-      logger.warn('[LCU] ARAM bench recommendation failed:', {
-        error: err.message,
-        durationMs: Date.now() - startedAt,
-      })
-
-      return {
-        success: true,
-        recommendation: createEmptyAramBenchRecommendation(err.message),
-        error: err.message,
-      }
     }
   })
 

@@ -2,13 +2,11 @@ export type Unsubscribe = () => void
 
 export type AppStoreKey =
   | 'lastSelectedChampionId'
-  | 'itemSets.autoApplyAram'
   | 'championInsight.showDetails'
   | 'championInsight.hideOnGameStart'
   | 'championInsight.alwaysOnTop'
   | 'augments.showTopOverlay'
   | 'augments.showSidePanel'
-  | 'postGameShare.autoShow'
 
 export type SupportedDataLocale = 'zh-CN' | 'zh-TW' | 'en-US'
 
@@ -53,101 +51,6 @@ export interface LooseRecord {
 export interface OperationResult extends LooseRecord {
   success: boolean
   error?: string
-}
-
-/** A locally collected champion + augment/item outcome aggregate. */
-export interface LocalMatchHistoryStat extends LooseRecord {
-  championId: number
-  championName?: string
-  subjectId: number
-  subjectName?: string
-  samples: number
-  wins: number
-  winRate: number
-}
-
-export interface LocalMatchHistoryRecentMatch extends LooseRecord {
-  gameId: number
-  gameCreation: number
-  gameMode: string
-  queueId: number
-  championId: number
-  championName?: string
-  kills: number
-  deaths: number
-  assists: number
-  win: boolean
-  subteamPlacement: number | null
-}
-
-export interface LocalMatchHistoryOverview extends LooseRecord {
-  /** LCU platform/shard, e.g. HN10, NA1, KR. Statistics never mix platforms. */
-  platformId: string | null
-  gameCount: number
-  playerCount: number
-  hextechAramGameCount: number
-  availableMatchedPlayerCount: number
-  pendingUploadCount: number
-}
-
-export interface LocalMatchHistorySummary extends LooseRecord {
-  updatedAt: number
-  currentPlayer: {
-    name: string
-  } | null
-  overview: LocalMatchHistoryOverview
-  recentMatches: LocalMatchHistoryRecentMatch[]
-  augmentStats: LocalMatchHistoryStat[]
-  itemStats: LocalMatchHistoryStat[]
-}
-
-export interface LocalMatchHistorySummaryResult extends OperationResult {
-  data: LocalMatchHistorySummary
-}
-
-export interface HextechAramMatchHistoryAsset extends LooseRecord {
-  id: number
-  name?: string
-  iconUrl?: string
-}
-
-export type HextechAramMatchResult = 'win' | 'loss' | 'remake'
-
-export interface HextechAramMatchHistoryMatch extends LooseRecord {
-  gameId: number
-  gameCreation: number
-  gameDuration: number
-  gameVersion: string
-  championId: number
-  championName?: string
-  championIconUrl?: string
-  kills: number
-  deaths: number
-  assists: number
-  result: HextechAramMatchResult
-  augments: HextechAramMatchHistoryAsset[]
-  items: HextechAramMatchHistoryAsset[]
-}
-
-export interface HextechAramMatchHistoryPage extends LooseRecord {
-  playerName: string
-  platformId: string
-  queriedAt: number
-  startIndex: number
-  count: number
-  returnedCount: number
-  hasPrevious: boolean
-  hasMore: boolean
-  matches: HextechAramMatchHistoryMatch[]
-}
-
-export interface HextechAramMatchHistoryQuery extends LooseRecord {
-  startIndex?: number
-  count?: number
-}
-
-export interface HextechAramMatchHistoryQueryResult extends OperationResult {
-  data?: HextechAramMatchHistoryPage
 }
 
 export interface ClientVersionInfo extends LooseRecord {
@@ -244,34 +147,6 @@ export interface PerkPage extends LooseRecord {
   subStyleId: number
 }
 
-export interface AramRecommendationCandidate extends LooseRecord {
-  championId: number
-  name: string
-  source: 'current' | 'bench' | 'teammate'
-  sourceLabel: string
-  isCurrent: boolean
-  winRate: number | null
-  pickRate: number | null
-  games: number | null
-  score: number
-  confidence: number
-  reasons: string[]
-}
-
-export interface AramBenchRecommendation extends LooseRecord {
-  readOnly: true
-  status: string
-  reason: string | null
-  gameflowPhase: GameflowPhase | null
-  currentChampion: AramRecommendationCandidate | null
-  recommendedChampion: AramRecommendationCandidate | null
-  candidates: AramRecommendationCandidate[]
-  deltaScore: number
-  confidence: number
-  reasons: string[]
-  generatedAt: number
-}
-
 export interface LcuStatusResult extends OperationResult {
   active: boolean
 }
@@ -282,10 +157,6 @@ export interface LcuSessionResult extends OperationResult {
 
 export interface LcuSnapshotResult extends OperationResult {
   snapshot: ChampSelectSnapshot | null
-}
-
-export interface LcuRecommendationResult extends OperationResult {
-  recommendation: AramBenchRecommendation
 }
 
 export interface LcuPerkListResult extends OperationResult {
@@ -336,10 +207,6 @@ export interface LocaleChangedPayload extends LooseRecord {
   dataVersion?: string
 }
 
-export interface MatchHistoryUpdatedPayload {
-  updatedAt: number
-}
-
 export interface ElectronEventMap {
   fromMain: [payload?: unknown]
   'for-popup': [payload: OverlayPayload]
@@ -352,17 +219,14 @@ export interface ElectronEventMap {
   'item-set-auto-apply-completed': [payload: LooseRecord]
   'game-started': [payload?: LooseRecord]
   'game-in-progress': [payload?: LooseRecord]
-  'bench-recommendation-preview': [payload: AramBenchRecommendation]
   'augment-detection-started': [payload?: LooseRecord]
   'augment-detected': [payload: OverlayPayload]
   'augment-cleared': [payload?: LooseRecord]
   'game-ended': [payload?: LooseRecord]
   'end-of-game': [payload?: LooseRecord]
-  'post-game-share-ready': [payload: LooseRecord]
   'quit-confirm-requested': []
   'app-update-status-changed': [payload: AppUpdateState]
   'locale-changed': [payload: LocaleChangedPayload]
-  'match-history-updated': [payload: MatchHistoryUpdatedPayload]
 }
 
 export type ElectronEventChannel = keyof ElectronEventMap
@@ -393,11 +257,6 @@ export interface ElectronAPI {
     download(): Promise<OperationResult & { data?: AppUpdateState }>
     install(): Promise<OperationResult & { data?: AppUpdateState }>
   }
-  analytics: {
-    getStatus(): Promise<LooseRecord>
-    setEnabled(enabled: boolean): Promise<LooseRecord>
-    track(name: string, properties?: LooseRecord): Promise<LooseRecord>
-  }
   locale: {
     get(): Promise<LocaleInfo>
     set(locale: SupportedDataLocale): Promise<LocaleInfo>
@@ -417,14 +276,6 @@ export interface ElectronAPI {
     getStats(): Promise<LooseRecord>
     getConfig(): Promise<LooseRecord>
   }
-  itemSets: {
-    getAramStatus(): Promise<OperationResult>
-    installAramChampion(payload: LooseRecord): Promise<OperationResult>
-  }
-  matchHistory: {
-    getLocalSummary(): Promise<LocalMatchHistorySummaryResult>
-    queryCurrent(payload?: HextechAramMatchHistoryQuery): Promise<HextechAramMatchHistoryQueryResult>
-  }
   feedback: {
     submit(payload: FeedbackSubmissionPayload): Promise<FeedbackSubmissionResult>
   }
@@ -434,7 +285,6 @@ export interface ElectronAPI {
     getStatus(): Promise<LcuStatusResult>
     getCurrentSession(): Promise<LcuSessionResult>
     getChampSelectSnapshot(): Promise<LcuSnapshotResult>
-    getAramBenchRecommendation(): Promise<LcuRecommendationResult>
     getPerkList(): Promise<LcuPerkListResult>
     applyPerk(data: LooseRecord): Promise<OperationResult>
     getGameflowPhase(): Promise<LcuGameflowResult>
@@ -448,20 +298,11 @@ export interface ElectronAPI {
     testShowFloating(data: LooseRecord): Promise<OperationResult>
     testShowRandomFloating(): Promise<OperationResult>
     testShowRandomPopup(): Promise<OperationResult>
-    testShowBenchRecommendation(): Promise<OperationResult>
     logRendererError(errorData: LooseRecord): Promise<OperationResult>
     logRendererInfo(data: LooseRecord): void
-    testDatabaseLoad(): Promise<OperationResult>
   }
   shell: {
     openExternal(url: string): Promise<OperationResult>
-  }
-  postGameShare: {
-    getLatest(): Promise<OperationResult & { data?: LooseRecord }>
-    refresh(): Promise<OperationResult & { data?: LooseRecord }>
-    createMock(): Promise<OperationResult & { data?: LooseRecord }>
-    copyImage(dataUrl: string): Promise<OperationResult>
-    saveImage(dataUrl: string, suggestedFilename?: string): Promise<OperationResult>
   }
   events: {
     on<K extends ElectronEventChannel>(

@@ -4,10 +4,7 @@ import './styles/index.css'
 import { createRouter, createWebHashHistory } from 'vue-router'
 
 import { electronAPI, hasElectronAPI } from './native/electron-api.ts'
-import { initRendererAnalytics, trackErrorEvent, trackPageView, trackAnalyticsEvent } from './services/analytics.ts'
 import { i18n, setAppLocale } from './i18n/index.ts'
-
-let appMounted = false
 
 /**
  * 发送错误到主进程
@@ -57,13 +54,6 @@ function getRouteSnapshot() {
   }
 }
 
-function shouldInitializeAnalyticsForCurrentWindow() {
-  const hash = window.location.hash || ''
-  return !hash || hash === '#' || hash === '#/' || hash.startsWith('#/display')
-}
-
-const analyticsEnabledForWindow = shouldInitializeAnalyticsForCurrentWindow()
-
 /**
  * 设置全局错误监听
  */
@@ -72,13 +62,6 @@ function setupGlobalErrorHandling(app) {
   app.config.errorHandler = (err, instance, info) => {
     const normalizedError = normalizeError(err)
     console.error('Vue Error:', err, info)
-    if (analyticsEnabledForWindow) {
-      trackErrorEvent('vue_error', err, {
-        component: getVueComponentName(instance),
-        info: info || '',
-        route: window.location.hash || '/',
-      })
-    }
     sendErrorToMain({
       type: 'vue-error',
       message: normalizedError.message,
@@ -96,12 +79,6 @@ function setupGlobalErrorHandling(app) {
   // Vue 警告处理器
   app.config.warnHandler = (msg, vm, trace) => {
     console.warn('Vue Warning:', msg, trace)
-    if (analyticsEnabledForWindow) {
-      trackAnalyticsEvent('vue_warning', {
-        message: String(msg || '').slice(0, 300),
-        route: window.location.hash || '/',
-      })
-    }
     sendErrorToMain({
       type: 'vue-warning',
       message: msg,
@@ -116,14 +93,6 @@ function setupGlobalErrorHandling(app) {
   window.addEventListener('error', (event) => {
     const normalizedError = normalizeError(event.error || event.message)
     console.error('Global Error:', event.error)
-    if (analyticsEnabledForWindow) {
-      trackErrorEvent('javascript_error', event.error || event.message, {
-        source: event.filename || 'unknown',
-        line: event.lineno || 0,
-        column: event.colno || 0,
-        route: window.location.hash || '/',
-      })
-    }
     sendErrorToMain({
       type: 'javascript-error',
       message: normalizedError.message || event.message || 'Unknown error',
@@ -142,11 +111,6 @@ function setupGlobalErrorHandling(app) {
   window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled Promise Rejection:', event.reason)
     const reason = normalizeError(event.reason)
-    if (analyticsEnabledForWindow) {
-      trackErrorEvent('unhandled_rejection', event.reason, {
-        route: window.location.hash || '/',
-      })
-    }
     sendErrorToMain({
       type: 'unhandledrejection',
       message: reason.message || 'Unhandled promise rejection',
@@ -185,12 +149,6 @@ const router = createRouter({
   ],
 })
 
-router.afterEach((to) => {
-  if (analyticsEnabledForWindow) {
-    trackPageView(to.name, to.fullPath || to.path)
-  }
-})
-
 const app = createApp(App)
 
 // 设置全局错误监听
@@ -223,32 +181,9 @@ async function mountApp() {
 
   await router.isReady()
   app.mount('#app')
-  appMounted = true
   await nextTick()
   if (hasElectronAPI()) electronAPI.windows.ready()
 }
 
 void mountApp()
 
-setTimeout(() => {
-  const root = document.getElementById('app')
-  const looksBlank = !appMounted || !root || root.childElementCount === 0 || (root.textContent || '').trim().length < 3
-  if (analyticsEnabledForWindow && looksBlank) {
-    trackAnalyticsEvent('white_screen_detected', {
-      route: window.location.hash || '/',
-      child_count: root?.childElementCount || 0,
-      text_length: (root?.textContent || '').trim().length,
-    })
-  }
-}, 5000)
-
-if (hasElectronAPI() && analyticsEnabledForWindow) {
-  initRendererAnalytics(electronAPI)
-    .then(() => {
-      const route = router.currentRoute.value
-      trackPageView(route.name, route.fullPath || route.path)
-    })
-    .catch((error) => {
-      console.warn('Failed to initialize analytics:', error)
-    })
-}

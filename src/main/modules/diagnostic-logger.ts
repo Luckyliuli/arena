@@ -109,9 +109,7 @@ async function collectLcuDiagnostics() {
 
 function collectConfigDiagnostics() {
     return {
-        itemSetAutoApplyAram: getStoreBoolean('itemSets.autoApplyAram', true),
         autoScreenshotGameflowControl: getStoreBoolean('autoScreenshotGameflowControl', true),
-        analyticsEnabled: getStoreBoolean('analytics.enabled', null),
         lastSelectedChampionId: store.get('lastSelectedChampionId') || null,
         appDataDir: getAppDataDir(),
         logDir: logger.getLogDir(),

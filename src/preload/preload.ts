@@ -17,17 +17,14 @@ const validEvents = new Set<ElectronEventChannel>([
   'item-set-auto-apply-completed',
   'game-started',
   'game-in-progress',
-  'bench-recommendation-preview',
   'augment-detection-started',
   'augment-detected',
   'augment-cleared',
   'game-ended',
   'end-of-game',
-  'post-game-share-ready',
   'quit-confirm-requested',
   'app-update-status-changed',
   'locale-changed',
-  'match-history-updated',
 ])
 
 function assertValidEvent(channel: string): asserts channel is ElectronEventChannel {
@@ -86,11 +83,6 @@ const electronAPI: ElectronAPI = {
     download: () => ipcRenderer.invoke('app-update-download'),
     install: () => ipcRenderer.invoke('app-update-install'),
   },
-  analytics: {
-    getStatus: () => ipcRenderer.invoke('analytics-get-status'),
-    setEnabled: (enabled) => ipcRenderer.invoke('analytics-set-enabled', enabled),
-    track: (name, properties) => ipcRenderer.invoke('analytics-track', name, properties),
-  },
   locale: {
     get: () => ipcRenderer.invoke('locale-get'),
     set: (locale) => ipcRenderer.invoke('locale-set', locale),
@@ -110,14 +102,6 @@ const electronAPI: ElectronAPI = {
     getStats: () => ipcRenderer.invoke('auto-screenshot-get-stats'),
     getConfig: () => ipcRenderer.invoke('auto-screenshot-get-config'),
   },
-  itemSets: {
-    getAramStatus: () => ipcRenderer.invoke('item-sets-get-aram-status'),
-    installAramChampion: (payload) => ipcRenderer.invoke('item-sets-install-aram-champion', payload),
-  },
-  matchHistory: {
-    getLocalSummary: () => ipcRenderer.invoke('match-history-get-local-summary'),
-    queryCurrent: (payload) => ipcRenderer.invoke('match-history-query-current', payload),
-  },
   feedback: {
     submit: (payload) => ipcRenderer.invoke('feedback-submit', payload),
   },
@@ -127,7 +111,6 @@ const electronAPI: ElectronAPI = {
     getStatus: () => ipcRenderer.invoke('lcu-get-status'),
     getCurrentSession: () => ipcRenderer.invoke('lcu-get-current-session'),
     getChampSelectSnapshot: () => ipcRenderer.invoke('lcu-get-champ-select-snapshot'),
-    getAramBenchRecommendation: () => ipcRenderer.invoke('lcu-get-aram-bench-recommendation'),
     getPerkList: () => ipcRenderer.invoke('lcu-get-perk-list'),
     applyPerk: (data) => ipcRenderer.invoke('lcu-apply-perk', data),
     getGameflowPhase: () => ipcRenderer.invoke('lcu-get-gameflow-phase'),
@@ -141,10 +124,8 @@ const electronAPI: ElectronAPI = {
     testShowFloating: (data) => ipcRenderer.invoke('test-show-floating', data),
     testShowRandomFloating: () => ipcRenderer.invoke('test-show-random-floating'),
     testShowRandomPopup: () => ipcRenderer.invoke('test-show-random-popup'),
-    testShowBenchRecommendation: () => ipcRenderer.invoke('test-show-bench-recommendation'),
     logRendererError: (errorData) => ipcRenderer.invoke('log-renderer-error', errorData),
     logRendererInfo: (data) => ipcRenderer.send('log-renderer-info', data),
-    testDatabaseLoad: () => ipcRenderer.invoke('test-database-load'),
   },
   shell: {
     openExternal: (url) => {
@@ -154,14 +135,6 @@ const electronAPI: ElectronAPI = {
       }
       return ipcRenderer.invoke('shell-open-external', parsedUrl.toString())
     },
-  },
-  postGameShare: {
-    getLatest: () => ipcRenderer.invoke('post-game-share-get-latest'),
-    refresh: () => ipcRenderer.invoke('post-game-share-refresh'),
-    createMock: () => ipcRenderer.invoke('post-game-share-create-mock'),
-    copyImage: (dataUrl) => ipcRenderer.invoke('post-game-share-copy-image', dataUrl),
-    saveImage: (dataUrl, suggestedFilename) =>
-      ipcRenderer.invoke('post-game-share-save-image', dataUrl, suggestedFilename),
   },
   events: { on, once },
 }

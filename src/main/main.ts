@@ -101,11 +101,6 @@ function setupMainProcessErrorHandling(): void {
         if (!logGlobalError('主进程未处理的 Promise 拒绝:', reason)) {
             return
         }
-        import('./services/analytics-service.ts').then(({ recordPendingAnalyticsEvent }) => {
-            recordPendingAnalyticsEvent('main_unhandled_rejection', {
-                message: reason instanceof Error ? reason.message : String(reason || 'unknown'),
-            })
-        }).catch(() => {})
     })
 
     // 捕获未捕获的异常
@@ -113,12 +108,6 @@ function setupMainProcessErrorHandling(): void {
         if (!logGlobalError('主进程未捕获的异常:', error)) {
             return
         }
-        import('./services/analytics-service.ts').then(({ recordPendingAnalyticsEvent }) => {
-            recordPendingAnalyticsEvent('main_uncaught_exception', {
-                message: error?.message || 'unknown',
-                name: error?.name || 'Error',
-            })
-        }).catch(() => {})
     })
 
     // 捕获警告
@@ -128,9 +117,6 @@ function setupMainProcessErrorHandling(): void {
 
     app.on('before-quit', () => {
         logger.info('[app] before-quit')
-        import('./services/analytics-service.ts').then(({ markAnalyticsAppCleanExit }) => {
-            markAnalyticsAppCleanExit()
-        }).catch(() => {})
     })
 
     app.on('render-process-gone', (_event, webContents, details) => {
@@ -139,25 +125,10 @@ function setupMainProcessErrorHandling(): void {
             exitCode: details.exitCode,
             url: webContents.getURL(),
         })
-        import('./services/analytics-service.ts').then(({ recordPendingAnalyticsEvent }) => {
-            recordPendingAnalyticsEvent('renderer_process_gone', {
-                reason: details.reason,
-                exit_code: details.exitCode,
-                url: webContents.getURL(),
-            })
-        }).catch(() => {})
     })
 
     app.on('child-process-gone', (_event, details) => {
         logger.error('[app] child process gone:', details)
-        import('./services/analytics-service.ts').then(({ recordPendingAnalyticsEvent }) => {
-            recordPendingAnalyticsEvent('child_process_gone', {
-                type: details.type,
-                reason: details.reason,
-                exit_code: details.exitCode,
-                name: details.name,
-            })
-        }).catch(() => {})
     })
 
     // 记录应用启动

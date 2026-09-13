@@ -38,11 +38,6 @@ export const electronAPI: ElectronAPI = {
     download: (...args) => requireElectronAPI().appUpdate.download(...args),
     install: (...args) => requireElectronAPI().appUpdate.install(...args),
   },
-  analytics: {
-    getStatus: (...args) => requireElectronAPI().analytics.getStatus(...args),
-    setEnabled: (...args) => requireElectronAPI().analytics.setEnabled(...args),
-    track: (...args) => requireElectronAPI().analytics.track(...args),
-  },
   locale: {
     get: (...args) => requireElectronAPI().locale.get(...args),
     set: (...args) => requireElectronAPI().locale.set(...args),
@@ -62,14 +57,6 @@ export const electronAPI: ElectronAPI = {
     getStats: (...args) => requireElectronAPI().autoScreenshot.getStats(...args),
     getConfig: (...args) => requireElectronAPI().autoScreenshot.getConfig(...args),
   },
-  itemSets: {
-    getAramStatus: (...args) => requireElectronAPI().itemSets.getAramStatus(...args),
-    installAramChampion: (...args) => requireElectronAPI().itemSets.installAramChampion(...args),
-  },
-  matchHistory: {
-    getLocalSummary: (...args) => requireElectronAPI().matchHistory.getLocalSummary(...args),
-    queryCurrent: (...args) => requireElectronAPI().matchHistory.queryCurrent(...args),
-  },
   feedback: {
     submit: (...args) => requireElectronAPI().feedback.submit(...args),
   },
@@ -79,8 +66,6 @@ export const electronAPI: ElectronAPI = {
     getStatus: (...args) => requireElectronAPI().lcu.getStatus(...args),
     getCurrentSession: (...args) => requireElectronAPI().lcu.getCurrentSession(...args),
     getChampSelectSnapshot: (...args) => requireElectronAPI().lcu.getChampSelectSnapshot(...args),
-    getAramBenchRecommendation: (...args) =>
-      requireElectronAPI().lcu.getAramBenchRecommendation(...args),
     getPerkList: (...args) => requireElectronAPI().lcu.getPerkList(...args),
     applyPerk: (...args) => requireElectronAPI().lcu.applyPerk(...args),
     getGameflowPhase: (...args) => requireElectronAPI().lcu.getGameflowPhase(...args),
@@ -97,21 +82,11 @@ export const electronAPI: ElectronAPI = {
       requireElectronAPI().diagnostics.testShowRandomFloating(...args),
     testShowRandomPopup: (...args) =>
       requireElectronAPI().diagnostics.testShowRandomPopup(...args),
-    testShowBenchRecommendation: (...args) =>
-      requireElectronAPI().diagnostics.testShowBenchRecommendation(...args),
     logRendererError: (...args) => requireElectronAPI().diagnostics.logRendererError(...args),
     logRendererInfo: (...args) => requireElectronAPI().diagnostics.logRendererInfo(...args),
-    testDatabaseLoad: (...args) => requireElectronAPI().diagnostics.testDatabaseLoad(...args),
   },
   shell: {
     openExternal: (...args) => requireElectronAPI().shell.openExternal(...args),
-  },
-  postGameShare: {
-    getLatest: (...args) => requireElectronAPI().postGameShare.getLatest(...args),
-    refresh: (...args) => requireElectronAPI().postGameShare.refresh(...args),
-    createMock: (...args) => requireElectronAPI().postGameShare.createMock(...args),
-    copyImage: (...args) => requireElectronAPI().postGameShare.copyImage(...args),
-    saveImage: (...args) => requireElectronAPI().postGameShare.saveImage(...args),
   },
   events: {
     on: (...args) => requireElectronAPI().events.on(...args),

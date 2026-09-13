@@ -19,11 +19,6 @@ import {
 } from './window-manager.ts'
 import autoScreenshotService from '../auto-screenshot-service.ts'
 import { getLCUServiceInstance } from '../services/lcu/lcu-service.ts'
-import {
-    requestLocalMatchHistoryBackgroundSync,
-    startLocalMatchHistoryBackgroundSync,
-    stopLocalMatchHistoryBackgroundSync,
-} from '../services/match-history/background-sync.ts'
 import { checkForClientUpdate } from '../version-checker.ts'
 import {
     checkForAppUpdate,
@@ -35,16 +30,6 @@ import {
     setAppUpdateInstallCleanup,
     shouldInstallDownloadedAppUpdateOnQuit,
 } from '../app-update-service.ts'
-import { initAnalyticsService, markAnalyticsAppCleanExit } from '../services/analytics-service.ts'
-import {
-    collectAramCandidateChampionIds,
-    getAramBenchRecommendation,
-} from '../services/aram/bench-recommendation.ts'
-import {
-    capturePostGameShareSnapshot,
-    preparePostGameSharePosterData,
-    resetPostGameShareSnapshot,
-} from '../services/post-game-share.ts'
 import logger from './logger.ts'
 import store from './app-store.ts'
 import {
@@ -103,8 +88,6 @@ const GAME_API_DIAGNOSTIC_KEYWORDS = [
     'upgrade',
     'card',
 ]
-const ITEM_SET_AUTO_APPLY_KEY = 'itemSets.autoApplyAram'
-const ITEM_SET_PRELOAD_CONCURRENCY = 3
 const AUGMENT_CLEAR_PHASES = new Set([
     'Lobby',
     'Matchmaking',
@@ -120,20 +103,11 @@ let lastGameWindowStatusKey = null
 let lastGameWindowStatusLogAt = 0
 let lastGameApiDiagnosticAt = 0
 let gameApiDiagnosticInFlight = false
-let itemSetAutoApplyInFlight = false
-let pendingAutoApplyChampionId = null
-let pendingAutoApplyReason = null
-let lastAutoAppliedItemSetChampionId = null
 let lastChampSelectInsightChampionId = null
 let lastInProgressInsightChampionId = null
 let lastInProgressChampionRecoveryAttemptAt = 0
 let inProgressChampionRecoveryInFlight = false
 let champSelectSnapshotPollInFlight = false
-let itemSetPreloadGeneration = 0
-let itemSetPreloadActiveCount = 0
-let itemSetPreloadQueue = []
-const itemSetPreloadInFlight = new Set()
-const itemSetPreloadDataByChampionId = new Map()
 
 /**
  * 初始化应用
@@ -208,13 +182,6 @@ export async function init({ startBackgroundServices = true } = {}) {
             logger.warn('[update] startup app update check failed:', error.message)
         })
     }, 2500)
-
-    initAnalyticsService().catch((error) => {
-        logger.debug('[analytics] initialization skipped:', error.message)
-    })
-    startLocalMatchHistoryBackgroundSync((updatedAt) => {
-        notifyAllWindows('match-history-updated', { updatedAt })
-    }, app.getVersion())
 
     // 初始化游戏流程监控（延迟初始化，避免阻塞应用启动）
     logger.info('将在后台初始化游戏流程监控...')
@@ -605,137 +572,12 @@ async function resolveChampionIdFromLiveClientData(liveClientData, currentSummon
         : null
 }
 
-function isAramItemSetAutoApplyEnabled() {
-    return store.get(ITEM_SET_AUTO_APPLY_KEY) !== false
-}
-
 function resetChampSelectItemSetState(reason) {
     lastChampSelectInsightChampionId = null
     lastInProgressInsightChampionId = null
     lastInProgressChampionRecoveryAttemptAt = 0
-    pendingAutoApplyChampionId = null
-    pendingAutoApplyReason = null
     champSelectSnapshotPollInFlight = false
-    itemSetPreloadGeneration += 1
-    itemSetPreloadQueue = []
-    itemSetPreloadDataByChampionId.clear()
-    logger.debug('[item-set] champ-select item set state reset', { reason })
-}
-
-function queueChampSelectItemSetPreload(championId, reason) {
-    if (
-        !championId ||
-        itemSetPreloadDataByChampionId.has(championId) ||
-        itemSetPreloadInFlight.has(championId) ||
-        itemSetPreloadQueue.some((queued) => queued.championId === championId)
-    ) {
-        return
-    }
-
-    itemSetPreloadQueue.push({
-        championId,
-        reason,
-        generation: itemSetPreloadGeneration,
-    })
-
-    logger.debug('[item-set] champ-select item set data preload queued', {
-        championId,
-        reason,
-        queueSize: itemSetPreloadQueue.length,
-    })
-    drainChampSelectItemSetPreloadQueue()
-}
-
-function drainChampSelectItemSetPreloadQueue() {
-    while (itemSetPreloadActiveCount < ITEM_SET_PRELOAD_CONCURRENCY && itemSetPreloadQueue.length > 0) {
-        const preloadTask = itemSetPreloadQueue.shift()
-        if (!preloadTask || preloadTask.generation !== itemSetPreloadGeneration) {
-            continue
-        }
-
-        const { championId, reason, generation } = preloadTask
-        if (itemSetPreloadDataByChampionId.has(championId) || itemSetPreloadInFlight.has(championId)) {
-            continue
-        }
-
-        itemSetPreloadActiveCount += 1
-        itemSetPreloadInFlight.add(championId)
-        void preloadChampSelectItemSetData(championId, reason, generation)
-            .finally(() => {
-                itemSetPreloadInFlight.delete(championId)
-                itemSetPreloadActiveCount = Math.max(0, itemSetPreloadActiveCount - 1)
-                drainChampSelectItemSetPreloadQueue()
-            })
-    }
-}
-
-async function preloadChampSelectItemSetData(championId, reason, generation) {
-    const startedAt = Date.now()
-
-    try {
-        const { loadChampionBuild, loadChampionName } = await import('../data-loader.ts')
-        const [build, championName] = await Promise.all([
-            loadChampionBuild(championId),
-            loadChampionName(championId),
-        ])
-
-        if (generation !== itemSetPreloadGeneration) {
-            return
-        }
-
-        const builds = Array.isArray(build?.builds) ? build.builds : []
-        const hasBuilds = builds.length > 0
-        const hasChampionName = championName && typeof championName === 'object'
-        if (hasBuilds || hasChampionName) {
-            itemSetPreloadDataByChampionId.set(championId, {
-                builds: hasBuilds ? builds : null,
-                championName: hasChampionName ? championName : null,
-            })
-        }
-
-        logger.debug('[item-set] champ-select item set data preloaded', {
-            championId,
-            reason,
-            hasBuilds,
-            buildCount: builds.length,
-            hasChampionName,
-            durationMs: Date.now() - startedAt,
-        })
-    } catch (error) {
-        if (generation !== itemSetPreloadGeneration) {
-            return
-        }
-
-        logger.warn('[item-set] champ-select item set data preload failed:', {
-            championId,
-            reason,
-            error: error.message,
-            durationMs: Date.now() - startedAt,
-        })
-    }
-}
-
-function preloadAramItemSetDataForChampSelect(snapshot, reason) {
-    if (!isAramItemSetAutoApplyEnabled() || snapshot?.gameflowPhase !== 'ChampSelect') {
-        return
-    }
-
-    const championIds = collectAramCandidateChampionIds(snapshot)
-        .map((championId) => normalizeChampionId(championId))
-        .filter(Boolean)
-
-    championIds.forEach((championId) => queueChampSelectItemSetPreload(championId, reason))
-}
-
-function buildRefreshableBenchRecommendation(snapshot) {
-    if (!snapshot || snapshot.gameflowPhase !== 'ChampSelect') {
-        return null
-    }
-
-    return {
-        ...getAramBenchRecommendation(snapshot, {}),
-        refreshable: true,
-    }
+    logger.debug('[champ-select] insight state reset', { reason })
 }
 
 async function showChampionInsightSnapshot(snapshot, reason) {
@@ -762,7 +604,6 @@ async function showChampionInsightSnapshot(snapshot, reason) {
     popupWindow.webContents.send('for-popup', {
         championId,
         augments: [],
-        benchRecommendation: buildRefreshableBenchRecommendation(snapshot),
         champSelect: true,
         dataSource: 'champ-select',
         timestamp: Date.now(),
@@ -770,8 +611,6 @@ async function showChampionInsightSnapshot(snapshot, reason) {
 
     logger.info('显示英雄详情选人视图', {
         championId,
-        benchCount: snapshot?.benchChampions?.length || 0,
-        benchCandidateCount: collectAramCandidateChampionIds(snapshot).length,
         snapshotStatus: snapshot?.status || 'unavailable',
         reason,
     })
@@ -798,20 +637,9 @@ async function pollChampSelectSnapshot(lcuService, reason, forceShow = false) {
         const championChanged = !!championId && championId !== lastChampSelectInsightChampionId
         const shouldShowEmpty = forceShow && !championId && lastChampSelectInsightChampionId == null
 
-        preloadAramItemSetDataForChampSelect(snapshot, reason)
-
         if (championChanged || shouldShowEmpty) {
             lastChampSelectInsightChampionId = championId
             await showChampionInsightSnapshot(snapshot, reason)
-        }
-
-        if (championChanged) {
-            logger.info('[item-set] champ-select current champion changed', {
-                championId,
-                reason,
-                snapshotStatus: snapshot?.status || 'unavailable',
-            })
-            void autoApplyAramItemSetForChampion(championId, reason)
         }
     } catch (error) {
         lastChampSelectInsightChampionId = null
@@ -826,21 +654,6 @@ async function pollChampSelectSnapshot(lcuService, reason, forceShow = false) {
 
 async function showChampionInsightForChampSelect(lcuService) {
     await pollChampSelectSnapshot(lcuService, 'champ-select-insight', true)
-}
-
-async function prepareAndNotifyPostGameShare(lcuService, reason) {
-    const result = await preparePostGameSharePosterData(lcuService, reason)
-    if (!result?.data || result.data.status === 'unavailable') {
-        logger.debug('[post-game-share] poster notification skipped', {
-            reason,
-            success: result?.success,
-            status: result?.data?.status || null,
-            error: result?.error || null,
-        })
-        return
-    }
-
-    await notifyAllWindows('post-game-share-ready', result.data)
 }
 
 async function resolveInProgressChampion(lcuService) {
@@ -954,111 +767,6 @@ async function recoverChampionInsightForInProgress(lcuService, reason) {
         })
     } finally {
         inProgressChampionRecoveryInFlight = false
-    }
-}
-
-async function autoApplyAramItemSetForChampion(championId, reason) {
-    const normalizedChampionId = Number(championId)
-    if (!Number.isFinite(normalizedChampionId) || normalizedChampionId <= 0) {
-        return
-    }
-
-    if (!isAramItemSetAutoApplyEnabled()) {
-        logger.debug('[item-set] auto apply skipped: disabled', {
-            championId: normalizedChampionId,
-            reason,
-        })
-        return
-    }
-
-    if (itemSetAutoApplyInFlight) {
-        pendingAutoApplyChampionId = normalizedChampionId
-        pendingAutoApplyReason = reason
-        logger.debug('[item-set] auto apply queued while another apply is running', {
-            championId: normalizedChampionId,
-            reason,
-            lastChampionId: lastAutoAppliedItemSetChampionId,
-        })
-        return
-    }
-
-    if (lastAutoAppliedItemSetChampionId === normalizedChampionId) {
-        logger.debug('[item-set] auto apply skipped: duplicate champion', {
-            championId: normalizedChampionId,
-            reason,
-            lastChampionId: lastAutoAppliedItemSetChampionId,
-        })
-        return
-    }
-
-    itemSetAutoApplyInFlight = true
-    logger.info('[item-set] auto apply requested for current champion', {
-        championId: normalizedChampionId,
-        reason,
-    })
-
-    try {
-        const { installAramItemSetForChampion } = await import('../services/item-sets/item-set-installer.ts')
-        const preloadedItemSetData = itemSetPreloadDataByChampionId.get(normalizedChampionId)
-        const result = await installAramItemSetForChampion({
-            championId: normalizedChampionId,
-            builds: preloadedItemSetData?.builds || null,
-            championName: preloadedItemSetData?.championName || null,
-        })
-
-        if (result?.success) {
-            lastAutoAppliedItemSetChampionId = normalizedChampionId
-        }
-
-        logger.info('[item-set] auto apply completed for current champion', {
-            championId: normalizedChampionId,
-            reason,
-            success: result?.success || false,
-            error: result?.error || null,
-            localRemovedCount: result?.localRemovedCount ?? null,
-            localWrittenCount: result?.localWrittenCount ?? null,
-            lcuRemovedCount: result?.lcuRemovedCount ?? null,
-            lcuItemSetCount: result?.lcuItemSetCount ?? null,
-            writtenItemSetCount: result?.writtenItemSetCount ?? null,
-            usedPreloadedData: !!preloadedItemSetData,
-            durationMs: result?.durationMs ?? null,
-        })
-        void notifyAllWindows('item-set-auto-apply-completed', {
-            championId: normalizedChampionId,
-            reason,
-            success: result?.success || false,
-            skipped: result?.skipped || false,
-            error: result?.error || null,
-            writtenItemSetCount: result?.writtenItemSetCount ?? null,
-            durationMs: result?.durationMs ?? null,
-        })
-    } catch (error) {
-        logger.warn('[item-set] auto apply failed for current champion:', {
-            championId: normalizedChampionId,
-            reason,
-            error: error.message,
-        })
-        void notifyAllWindows('item-set-auto-apply-completed', {
-            championId: normalizedChampionId,
-            reason,
-            success: false,
-            skipped: false,
-            error: error.message || '装备推荐写入失败',
-            writtenItemSetCount: 0,
-            durationMs: null,
-        })
-    } finally {
-        itemSetAutoApplyInFlight = false
-        if (pendingAutoApplyChampionId && pendingAutoApplyChampionId !== lastAutoAppliedItemSetChampionId) {
-            const nextChampionId = pendingAutoApplyChampionId
-            const nextReason = pendingAutoApplyReason || 'champ-select-pending'
-            pendingAutoApplyChampionId = null
-            pendingAutoApplyReason = null
-            void autoApplyAramItemSetForChampion(nextChampionId, nextReason)
-        } else {
-            pendingAutoApplyChampionId = null
-            pendingAutoApplyReason = null
-        }
     }
 }
 
@@ -1210,21 +918,14 @@ async function initGameFlowMonitor() {
                 notifyAllWindows('game-phase-changed', { phase: currentPhase, prevPhase })
                 clearAugmentOverlayForPhase(currentPhase)
                 void logReadOnlyGameApiDiagnostics(lcuService, currentPhase, `phase-change:${source}`, true)
-                if (currentPhase === 'Lobby' || currentPhase === 'None') {
-                    requestLocalMatchHistoryBackgroundSync(`phase-change:${currentPhase}`)
-                }
-
                 // 状态机只决定阶段入口效果，Electron/LCU 副作用仍由主进程执行。
                 switch (transition.entryEffect) {
                     case 'RESET_IDLE_SERVICES':
-                        lastAutoAppliedItemSetChampionId = null
                         resetChampSelectItemSetState(`LCU phase ${currentPhase}`)
                         stopAutoScreenshotForGame(`LCU phase ${currentPhase}`)
                         break
                     case 'ENTER_CHAMP_SELECT':
                         logger.info('进入选人阶段 - 暂停游戏内海克斯 OCR')
-                        resetPostGameShareSnapshot('LCU phase ChampSelect')
-                        lastAutoAppliedItemSetChampionId = null
                         resetChampSelectItemSetState(`LCU phase ${phase}`)
                         notifyAllWindows('champ-select-start', {})
                         stopAutoScreenshotForGame('LCU phase ChampSelect')
@@ -1232,7 +933,6 @@ async function initGameFlowMonitor() {
                         break
                     case 'ENTER_GAME_START':
                         logger.info('游戏开始加载')
-                        resetPostGameShareSnapshot('LCU phase GameStart')
                         notifyAllWindows('game-started', {})
                         resetChampSelectItemSetState('LCU phase GameStart')
                         stopAutoScreenshotForGame('LCU phase GameStart')
@@ -1242,26 +942,22 @@ async function initGameFlowMonitor() {
                         notifyAllWindows('game-in-progress', {})
                         resetChampSelectItemSetState('LCU phase InProgress')
                         void recoverChampionInsightForInProgress(lcuService, 'LCU phase InProgress')
-                        void capturePostGameShareSnapshot(lcuService, 'LCU phase InProgress')
                         await startAutoScreenshotForGame('LCU phase InProgress')
                         break
                     case 'ENTER_WAITING_FOR_STATS':
                         logger.info('游戏已结束')
                         notifyAllWindows('game-ended', {})
-                        void prepareAndNotifyPostGameShare(lcuService, 'LCU phase WaitingForStats')
                         resetChampSelectItemSetState('LCU phase WaitingForStats')
                         stopAutoScreenshotForGame('LCU phase WaitingForStats')
                         break
                     case 'ENTER_PRE_END_OF_GAME':
                         logger.info('游戏结束统计阶段')
-                        void prepareAndNotifyPostGameShare(lcuService, 'LCU phase PreEndOfGame')
                         resetChampSelectItemSetState('LCU phase PreEndOfGame')
                         stopAutoScreenshotForGame('LCU phase PreEndOfGame')
                         break
                     case 'ENTER_END_OF_GAME':
                         logger.info('游戏完全结束')
                         notifyAllWindows('end-of-game', {})
-                        void prepareAndNotifyPostGameShare(lcuService, 'LCU phase EndOfGame')
                         resetChampSelectItemSetState('LCU phase EndOfGame')
                         stopAutoScreenshotForGame('LCU phase EndOfGame')
                         break
@@ -1272,7 +968,6 @@ async function initGameFlowMonitor() {
 
             if (phase === GAMEFLOW_AUGMENT_ANALYSIS_PHASE) {
                 void logReadOnlyGameApiDiagnostics(lcuService, phase, `heartbeat:${source}`)
-                void capturePostGameShareSnapshot(lcuService, `heartbeat:${source}`)
                 if (lastInProgressInsightChampionId == null) {
                     void recoverChampionInsightForInProgress(lcuService, 'LCU phase InProgress heartbeat')
                 }
@@ -1421,11 +1116,9 @@ async function initGameFlowMonitor() {
  */
 async function runQuitCleanup(reason = 'app quit') {
     logger.info('App is quitting, cleaning up...', { reason })
-    markAnalyticsAppCleanExit()
     stopPerformanceMonitor(reason)
 
     stopGameflowMonitorRuntime('app will quit')
-    stopLocalMatchHistoryBackgroundSync()
 
     if (autoScreenshotService && autoScreenshotService.isRunning) {
         autoScreenshotService.stop()

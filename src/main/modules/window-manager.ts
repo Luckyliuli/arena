@@ -37,11 +37,11 @@ const __dirname = path.dirname(__filename)
 const OPEN_OVERLAY_DEVTOOLS = process.env.ARAMGG_OPEN_OVERLAY_DEVTOOLS === '1'
 const RENDERER_CONTENT_SECURITY_POLICY = [
     "default-src 'self'",
-    "script-src 'self' https://www.googletagmanager.com",
+    "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
-    "connect-src 'self' ws://localhost:* ws://127.0.0.1:* https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.googleapis.com",
+    "connect-src 'self' ws://localhost:* ws://127.0.0.1:*",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'none'",

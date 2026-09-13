@@ -65,8 +65,6 @@ export function createReleaseSmoke() {
             try {
                 await Promise.race([
                     (async () => {
-                        const { default: store } = await import('../modules/app-store.ts')
-                        store.set('itemSets.autoApplyAram', false)
                         await initialize()
                         while (ready.size < ROUTES.length) {
                             if (failures.length) throw new Error(failures.join('\n'))

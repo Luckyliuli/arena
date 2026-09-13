@@ -204,30 +204,9 @@
                     </div>
                 </div>
 
-                <ItemSetInstaller />
-                <OverlayPreferences
-                    @post-game-auto-show-changed="setPostGameShareAutoShowEnabled"
-                />
+                <OverlayPreferences />
                 <ChampionMonitor />
-                <MatchHistoryPanel />
 
-                <section class="post-game-panel">
-                    <div class="section-header">
-                        <p class="section-kicker">{{ t('display.postGamePoster') }}</p>
-                    </div>
-                    <button
-                        class="post-game-share-button mock"
-                        type="button"
-                        :disabled="postGameShareLoading"
-                        @click="createMockPostGameSharePoster"
-                    >
-                        <Sparkles class="icon" />
-                        <span class="button-copy">
-                            <span class="text">{{ t('display.mockGenerate') }}</span>
-                            <span class="hint">{{ t('display.refreshPreviewEveryClick') }}</span>
-                        </span>
-                    </button>
-                </section>
 
                 <section class="diagnostic-panel">
                     <div class="section-header">
@@ -251,13 +230,6 @@
                             </span>
                         </button>
 
-                        <button class="test-btn warning" @click="testDatabaseLoad">
-                            <Database class="icon" />
-                            <span class="button-copy">
-                                <span class="text">{{ t('display.dataProbe') }}</span>
-                                <span class="hint">{{ t('display.checkDataLoading') }}</span>
-                            </span>
-                        </button>
 
                     </div>
 
@@ -270,20 +242,10 @@
             <footer class="hex-footer">
                 <p>
                     {{ t('display.brand') }} v{{ clientVersionLabel }} -
-                    <a class="footer-link" :href="ARAMGG_HOME_URL" @click.prevent="openAramggHome">
-                        {{ ARAMGG_HOME_LABEL }}
-                    </a>
-                    <span class="footer-separator">·</span>
                     <button class="footer-link footer-action" type="button" @click="openLogDirectory">
                         {{ t('display.logDirectory') }}
                     </button>
                     <span class="footer-separator">·</span>
-                    <a class="footer-link" :href="DATA_API_URL" @click.prevent="openDataApi">
-                        {{ DATA_API_LABEL }}
-                    </a>
-                </p>
-                <p class="footer-feedback">
-                    {{ t('display.feedback') }}
                     <button class="footer-link footer-action" type="button" @click="openFeedbackWidget">
                         {{ t('feedback.button') }}
                     </button>
@@ -360,25 +322,7 @@
                 </section>
             </div>
 
-            <PostGameShareModal
-                v-if="showPostGameShare && postGamePoster"
-                :poster="postGamePoster"
-                @close="closePostGameShare"
-            />
-
-            <button
-                v-if="shouldShowPostGameFloatingShare && !feedbackOpen"
-                class="post-game-floating-share"
-                type="button"
-                :title="t('display.shareReport')"
-                :disabled="postGameShareLoading"
-                @click="openPostGameShareFromFloatingButton"
-            >
-                <Share2 class="icon" />
-                <span>{{ postGameShareFloatingLabel }}</span>
-            </button>
-
-            <FeedbackWidget
+<FeedbackWidget
                 ref="feedbackWidget"
                 @open-change="feedbackOpen = $event"
             />
@@ -388,12 +332,9 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import ItemSetInstaller from './ItemSetInstaller.vue'
 import OverlayPreferences from './OverlayPreferences.vue'
 import ChampionMonitor from './ChampionMonitor.vue'
-import MatchHistoryPanel from './MatchHistoryPanel.vue'
 import FeedbackWidget from './FeedbackWidget.vue'
-import PostGameShareModal from './PostGameShareModal.vue'
 import {
     Select,
     SelectContent,
@@ -402,9 +343,7 @@ import {
     SelectValue,
 } from './ui/select/index.js'
 import { useAppUpdate } from '../composables/use-app-update.ts'
-import { usePostGameShare } from '../composables/use-post-game-share.ts'
 import { electronAPI } from '../native/electron-api.ts'
-import { trackAnalyticsEvent } from '../services/analytics.ts'
 import { useI18n } from 'vue-i18n'
 import {
     ChevronRight,
@@ -419,8 +358,6 @@ import {
     RotateCw,
     Save,
     ScrollText,
-    Share2,
-    Sparkles,
     Target,
     Trash2,
     X,
@@ -445,10 +382,6 @@ const supportedLocales = ref([
     { code: 'zh-TW', label: 'Traditional Chinese', nativeLabel: '繁體中文' },
 ])
 const localeLoading = ref(false)
-const ARAMGG_HOME_URL = 'https://aramgg.com'
-const ARAMGG_HOME_LABEL = 'aramgg.com'
-const DATA_API_URL = 'https://data.dtodo.cn'
-const DATA_API_LABEL = computed(() => t('display.openApi'))
 const GITHUB_URL = 'https://github.com/valkia/aramgg_client'
 let removeQuitConfirmListener = null
 let removeLocaleChangedListener = null
@@ -519,17 +452,6 @@ const changelogEntries = computed(() => {
 
 const hasChangelog = computed(() => changelogEntries.value.length > 0)
 
-const {
-    showPostGameShare,
-    postGamePoster,
-    postGameShareLoading,
-    shouldShowPostGameFloatingShare,
-    postGameShareFloatingLabel,
-    closePostGameShare,
-    openPostGameShareFromFloatingButton,
-    createMockPostGameSharePoster,
-    setPostGameShareAutoShowEnabled,
-} = usePostGameShare(testStatus)
 
 const loadVersionInfo = async () => {
     const requestedLocale = activeLocale.value
@@ -594,11 +516,6 @@ const changeLocale = async (requestedLocale = selectedLocale.value) => {
             type: 'success',
             message: t('display.localeChanged', { locale: selectedLocaleLabel.value }),
         }
-        trackAnalyticsEvent('language_switch', {
-            from_language: previousLocale,
-            to_language: activeLocale.value,
-            data_version: result?.dataVersion || '',
-        })
     } catch (error) {
         selectedLocale.value = activeLocale.value
         console.warn('Failed to change locale:', error)
@@ -606,11 +523,6 @@ const changeLocale = async (requestedLocale = selectedLocale.value) => {
             type: 'error',
             message: t('display.localeChangeFailed', { error: error.message || error }),
         }
-        trackAnalyticsEvent('language_switch_failure', {
-            from_language: previousLocale,
-            to_language: requestedLocale,
-            error_message: error?.message || String(error),
-        })
     } finally {
         localeLoading.value = false
     }
@@ -769,21 +681,7 @@ const openDownloadUrl = async () => {
     }
 }
 
-const openAramggHome = async () => {
-    try {
-        await electronAPI.shell.openExternal(ARAMGG_HOME_URL)
-    } catch (error) {
-        console.warn('Failed to open ARAMGG home:', error)
-    }
-}
 
-const openDataApi = async () => {
-    try {
-        await electronAPI.shell.openExternal(DATA_API_URL)
-    } catch (error) {
-        console.warn('Failed to open data API:', error)
-    }
-}
 
 const openFeedbackWidget = () => {
     feedbackWidget.value?.open()
@@ -897,33 +795,6 @@ const testPopupWindow = async () => {
     }
 }
 
-const testDatabaseLoad = async () => {
-    testStatus.value = { type: 'info', message: t('display.testingData') }
-
-    try {
-        const result = await electronAPI.diagnostics.testDatabaseLoad()
-        console.log('Database test result', result)
-
-        if (result.success) {
-            testStatus.value = {
-                type: 'success',
-                message: t('display.dataLoaded', { count: result.dataCount }),
-            }
-        } else {
-            let errorMsg = result.error || t('common.unknownError')
-            if (result.tests) {
-                const failedTests = result.tests
-                    .map((t, i) => '[' + (i + 1) + '] ' + (t.exists ? 'OK' : 'MISS') + ' ' + t.path.substring(0, 60) + '...')
-                    .join('\\n')
-                errorMsg += `\\n\\n${t('display.pathCheckResults')}\\n${failedTests}`
-            }
-            testStatus.value = { type: 'error', message: errorMsg }
-        }
-    } catch (err) {
-        testStatus.value = { type: 'error', message: t('display.testFailed', { error: err.message }) }
-        console.error('Database test error', err)
-    }
-}
 
 const hideMainWindow = () => {
     try {
@@ -1676,173 +1547,6 @@ onBeforeUnmount(() => {
     background: rgba(255, 180, 171, 0.14);
 }
 
-.post-game-panel {
-    padding: 14px;
-    border-top: 1px solid rgba(244, 236, 220, 0.06);
-}
-
-.post-game-share-button {
-    width: 100%;
-    min-height: 58px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    position: relative;
-    overflow: hidden;
-    padding: 10px 12px;
-    border: 0;
-    border-radius: 6px;
-    color: #061116;
-    background:
-        linear-gradient(135deg, rgba(155, 232, 220, 0.96), rgba(231, 189, 104, 0.92));
-    box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.12),
-        0 14px 28px rgba(0, 0, 0, 0.28);
-    text-align: left;
-    cursor: pointer;
-    transition-property: scale, filter, box-shadow, opacity;
-    transition-duration: 150ms;
-    transition-timing-function: ease-out;
-}
-
-.post-game-share-button::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    pointer-events: none;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.32), transparent);
-    transition-property: opacity;
-    transition-duration: 160ms;
-    transition-timing-function: ease-out;
-}
-
-.post-game-share-button:hover:not(:disabled) {
-    filter: brightness(1.05);
-    box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.16),
-        0 18px 34px rgba(0, 0, 0, 0.34);
-}
-
-.post-game-share-button:hover:not(:disabled)::before {
-    opacity: 1;
-}
-
-.post-game-share-button:active:not(:disabled) {
-    scale: 0.96;
-}
-
-.post-game-share-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.58;
-}
-
-.post-game-share-button.mock {
-    color: #d7e4f1;
-    background:
-        linear-gradient(135deg, rgba(25, 38, 48, 0.95), rgba(37, 49, 57, 0.9));
-    box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.1),
-        0 12px 24px rgba(0, 0, 0, 0.24);
-}
-
-.post-game-share-button.mock:hover:not(:disabled) {
-    filter: brightness(1.08);
-    box-shadow:
-        0 0 0 1px rgba(155, 232, 220, 0.22),
-        0 16px 30px rgba(0, 0, 0, 0.3);
-}
-
-.post-game-share-button .icon {
-    width: 19px;
-    height: 19px;
-    flex: 0 0 auto;
-    color: #061116;
-}
-
-.post-game-share-button.mock .icon {
-    color: #9be8dc;
-}
-
-.post-game-share-button .text,
-.post-game-share-button .hint {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.post-game-share-button .text {
-    font-size: 13px;
-    font-weight: 900;
-}
-
-.post-game-share-button .hint {
-    margin-top: 2px;
-    color: rgba(6, 17, 22, 0.72);
-    font-size: 10px;
-    font-weight: 800;
-}
-
-.post-game-share-button.mock .hint {
-    color: rgba(215, 228, 241, 0.62);
-}
-
-.post-game-floating-share {
-    position: absolute;
-    right: 16px;
-    bottom: 130px;
-    z-index: 8;
-    width: 128px;
-    height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 0 16px 0 14px;
-    border: 0;
-    border-radius: 999px;
-    color: #061116;
-    background:
-        linear-gradient(135deg, rgba(155, 232, 220, 0.98), rgba(231, 189, 104, 0.96));
-    box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.16),
-        0 14px 28px rgba(0, 0, 0, 0.34),
-        0 0 22px rgba(155, 232, 220, 0.16);
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 900;
-    transition-property: scale, filter, box-shadow, opacity;
-    transition-duration: 150ms;
-    transition-timing-function: ease-out;
-}
-
-.post-game-floating-share:hover:not(:disabled) {
-    filter: brightness(1.06);
-    box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.2),
-        0 18px 34px rgba(0, 0, 0, 0.4),
-        0 0 28px rgba(155, 232, 220, 0.22);
-}
-
-.post-game-floating-share:active:not(:disabled) {
-    scale: 0.96;
-}
-
-.post-game-floating-share:disabled {
-    cursor: not-allowed;
-    opacity: 0.58;
-}
-
-.post-game-floating-share .icon {
-    width: 17px;
-    height: 17px;
-    flex: 0 0 auto;
-}
-
-.diagnostic-panel {
-    padding: 14px;
-}
 
 .section-kicker {
     margin: 0 0 6px;
@@ -2345,3 +2049,4 @@ onBeforeUnmount(() => {
     }
 }
 </style>
+

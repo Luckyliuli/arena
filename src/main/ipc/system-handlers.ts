@@ -6,11 +6,6 @@ import {
   installDownloadedAppUpdate,
 } from '../app-update-service.ts'
 import autoScreenshotService from '../auto-screenshot-service.ts'
-import {
-  getAnalyticsStatus,
-  setAnalyticsEnabled,
-  trackAnalyticsEvent,
-} from '../services/analytics-service.ts'
 import { logDiagnosticSnapshot } from '../modules/diagnostic-logger.ts'
 import logger from '../modules/logger.ts'
 import { getVersionInfo } from '../version-checker.ts'
@@ -123,38 +118,6 @@ export function registerSystemIpcHandlers(): void {
       logger.warn('Failed to open log directory:', message)
       return { success: false, error: message }
     }
-  })
-
-  ipcMain.handle('analytics-get-status', async () => {
-    try {
-      return { success: true, data: await getAnalyticsStatus() }
-    } catch (error) {
-      return { success: false, error: (error as Error).message }
-    }
-  })
-
-  ipcMain.handle('analytics-set-enabled', async (_event, enabled: unknown) => {
-    if (typeof enabled !== 'boolean') {
-      return { success: false, error: 'Analytics enabled state must be boolean' }
-    }
-
-    try {
-      return { success: true, data: await setAnalyticsEnabled(enabled) }
-    } catch (error) {
-      return { success: false, error: (error as Error).message }
-    }
-  })
-
-  ipcMain.handle('analytics-track', async (_event, name: unknown, properties: unknown = {}) => {
-    if (typeof name !== 'string' || !name.trim()) {
-      return { success: false, error: 'Analytics event name is required' }
-    }
-
-    if (properties != null && typeof properties !== 'object') {
-      return { success: false, error: 'Analytics properties must be an object' }
-    }
-
-    return trackAnalyticsEvent()
   })
 
   ipcMain.handle('shell-open-external', async (_event, url: unknown) => {

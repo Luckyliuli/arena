@@ -43,10 +43,6 @@
 
         <div class="insight-scroll">
           <section v-if="!isSidePanel" class="bench-inline">
-            <AramBenchRecommendation
-              compact
-              :preview-recommendation="benchPreviewRecommendation"
-            />
           </section>
 
           <section v-if="!isSidePanel" class="champion-hero">
@@ -56,7 +52,6 @@
               :alt="championName"
               class="hero-image"
               @error="handleImageError"
-            />
             <div v-else class="hero-placeholder">--</div>
             <div class="hero-shade"></div>
             <div class="hero-content">
@@ -66,7 +61,6 @@
                     :src="getChampionSquareIconUrl(championId)"
                     :alt="championName"
                     @error="handleImageError"
-                  />
                 </div>
                 <h2 class="champion-name">{{ championName || (championId ? t('augment.championFallback', { id: championId }) : t('augment.waitingChampion')) }}</h2>
               </div>
@@ -180,7 +174,6 @@
                       :src="getAugmentIconUrl(augment.iconPath)"
                       :alt="augment.name"
                       class="augment-icon"
-                    />
                     <span v-else>{{ index + 1 }}</span>
                   </div>
                   <div class="augment-main">
@@ -272,7 +265,6 @@
                               class="spell-icon"
                               :alt="t('augment.summonerSpellFallback', { id: spellId })"
                               :title="t('augment.summonerSpellFallback', { id: spellId })"
-                            />
                           </div>
                         </div>
                         <div class="recommendation-stats">
@@ -340,7 +332,6 @@
                             :src="getItemIconUrl(itemId)"
                             class="item-icon small"
                             :alt="getItemName(itemId)"
-                          />
                         </div>
                         <span>{{ formatPercent(build.winRate) }}</span>
                       </div>
@@ -361,7 +352,6 @@
                           :src="getItemIconUrl(itemId)"
                           class="item-icon"
                           :alt="getItemName(itemId)"
-                        />
                       </div>
                       <div class="build-stats">
                         <span>{{ formatPercent(build.winRate) }}</span>
@@ -387,7 +377,6 @@
                             :src="getItemIconUrl(itemId)"
                             class="item-icon"
                             :alt="getItemName(itemId)"
-                          />
                         </div>
                         <div class="build-stats">
                           <span>{{ formatPercent(build.winRate) }}</span>
@@ -407,7 +396,6 @@
                         :src="getItemIconUrl(item.itemId)"
                         class="item-icon small"
                         :alt="getItemName(item.itemId)"
-                      />
                     </div>
                   </section>
 
@@ -420,7 +408,6 @@
                         :src="getItemIconUrl(item.itemId)"
                         class="item-icon small"
                         :alt="getItemName(item.itemId)"
-                      />
                     </div>
                   </section>
                 </article>
@@ -461,7 +448,6 @@
               v-if="augmentTooltipDetail.iconUrl"
               :src="augmentTooltipDetail.iconUrl"
               :alt="augmentTooltipDetail.name"
-            />
             <div>
               <strong>{{ augmentTooltipDetail.name }}</strong>
               <span v-if="augmentTooltipDetail.rarityLabel">{{ augmentTooltipDetail.rarityLabel }}</span>
@@ -510,7 +496,6 @@ import {
   handleImageError,
 } from '../service/overlay-formatters.ts'
 import { useAugmentTooltip } from '../composables/use-augment-tooltip.ts'
-import AramBenchRecommendation from './AramBenchRecommendation.vue'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps({

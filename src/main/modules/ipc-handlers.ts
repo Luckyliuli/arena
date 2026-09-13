@@ -1,17 +1,10 @@
-import { BrowserWindow, clipboard, dialog, nativeImage, type OpenDialogOptions } from 'electron'
-import { writeFile } from 'fs/promises'
+import { dialog, type OpenDialogOptions } from 'electron'
 import path from 'path'
 import { captureScreenshot } from '../screenshot.ts'
 import { analyzeScreenshot } from '../image-analyzer.ts'
 import autoScreenshotService from '../auto-screenshot-service.ts'
 import { registerLCUIpcHandlers } from '../services/lcu/ipc-handlers.ts'
 import { getLCUServiceInstance } from '../services/lcu/lcu-service.ts'
-import { registerMatchHistoryIpcHandlers } from '../services/match-history/ipc-handlers.ts'
-import {
-    createMockPostGameSharePosterData,
-    getLatestPostGameSharePosterData,
-    preparePostGameSharePosterData,
-} from '../services/post-game-share.ts'
 import {
     applyAugmentSidePanelWindowLayout,
     applyFloatingWindowLayout,
@@ -27,7 +20,6 @@ import {
 import logger from './logger.ts'
 import { markRendererReady } from './renderer-ready.ts'
 import store from './app-store.ts'
-import { getAppDataDir } from './app-paths.ts'
 import {
     shouldShowChampionDetails,
     shouldShowAugmentSidePanel,
@@ -40,9 +32,7 @@ import {
 } from './lol-path.ts'
 import {
     getDataLocale,
-    loadChampionRoster,
 } from '../data-loader.ts'
-import { getAramBenchRecommendation } from '../services/aram/bench-recommendation.ts'
 import { registerPreferencesIpcHandlers } from '../ipc/preferences-handlers.ts'
 import { registerSystemIpcHandlers } from '../ipc/system-handlers.ts'
 import { registerFeedbackIpcHandlers } from '../ipc/feedback-handlers.ts'
@@ -50,7 +40,6 @@ import { trustedIpcMain as ipcMain } from '../security/trusted-ipc.ts'
 import { shouldRaiseOverlayWindow } from './overlay-window-state.ts'
 
 const TEST_AUGMENT_COUNT = 3
-const TEST_BENCH_CHAMPION_COUNT = 8
 const LCU_MANUAL_LEAGUE_PATH_KEY = 'lolPath'
 const BROADCAST_CHANNELS = new Set([
     'fromMain',
@@ -63,17 +52,14 @@ const BROADCAST_CHANNELS = new Set([
     'item-set-auto-apply-completed',
     'game-started',
     'game-in-progress',
-    'bench-recommendation-preview',
     'augment-detection-started',
     'augment-detected',
     'augment-cleared',
     'game-ended',
     'end-of-game',
-    'post-game-share-ready',
     'locale-changed',
 ])
 const championDataLoadRequests = new Map<string, Promise<unknown>>()
-const MAX_POSTER_DATA_URL_LENGTH = 24 * 1024 * 1024
 
 function getElapsedMs(startedAt: number): number {
     return Date.now() - startedAt
@@ -93,34 +79,6 @@ function suppressManualAugmentOverlayReshow(reason: unknown, source: string): vo
     } catch (error) {
         logger.warn('[overlay] failed to suppress manual augment reshow:', getErrorMessage(error))
     }
-}
-
-function getPosterPngBuffer(dataUrl: unknown): Buffer {
-    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/png;base64,')) {
-        throw new Error('Invalid poster image format')
-    }
-
-    if (dataUrl.length > MAX_POSTER_DATA_URL_LENGTH) {
-        throw new Error('Poster image is too large')
-    }
-
-    const base64 = dataUrl.slice('data:image/png;base64,'.length)
-    const buffer = Buffer.from(base64, 'base64')
-    if (!buffer.length) {
-        throw new Error('Poster image is empty')
-    }
-
-    return buffer
-}
-
-function getPosterSavePath(filePath: unknown): string {
-    if (typeof filePath !== 'string' || !filePath) {
-        return ''
-    }
-
-    return path.extname(filePath).toLowerCase() === '.png'
-        ? filePath
-        : `${filePath}.png`
 }
 
 async function validateLolDirectory(lolPath: unknown) {
@@ -316,47 +274,7 @@ async function buildRandomAugmentPreviewData(context = 'random-augment-preview')
     throw new Error('没有可用英雄海克斯数据')
 }
 
-async function buildRandomBenchRecommendation(currentChampionId: number | null = null) {
-    const champions = await loadChampionRoster()
-
-    if (champions.length < 2) {
-        throw new Error('没有足够的英雄数据用于席位推荐')
-    }
-
-    const requestedChampionId = Number(currentChampionId)
-    const preferredChampion = Number.isFinite(requestedChampionId)
-        ? champions.find((champion) => Number(champion.championId) === requestedChampionId)
-        : null
-    const benchPool = preferredChampion
-        ? champions.filter((champion) => Number(champion.championId) !== Number(preferredChampion.championId))
-        : champions
-    const selectedChampions = preferredChampion
-        ? [
-            preferredChampion,
-            ...sampleItems(benchPool, Math.min(TEST_BENCH_CHAMPION_COUNT - 1, benchPool.length)),
-        ]
-        : sampleItems(champions, Math.min(TEST_BENCH_CHAMPION_COUNT, champions.length))
-    const [currentChampion, ...benchChampions] = selectedChampions
-    const championStatsById = selectedChampions.reduce((result, champion) => {
-        result[champion.championId] = champion
-        return result
-    }, {})
-
-    return getAramBenchRecommendation(
-        {
-            status: 'ready',
-            gameflowPhase: 'ChampSelect',
-            selfChampionId: Number(currentChampion.championId),
-            benchEnabled: benchChampions.length > 0,
-            benchChampions: benchChampions.map((champion) => ({
-                championId: Number(champion.championId),
-            })),
-        },
-        championStatsById
-    )
-}
-
-export function registerIpcHandlers(isDev: boolean): void {
+export function registerIpcHandlers(_isDev: boolean): void {
     registerPreferencesIpcHandlers()
     registerSystemIpcHandlers()
     registerFeedbackIpcHandlers()
@@ -568,12 +486,10 @@ export function registerIpcHandlers(isDev: boolean): void {
             })
 
             const data = await buildRandomAugmentPreviewData('random-popup-test')
-            const benchRecommendation = await buildRandomBenchRecommendation(data.championId)
             popupWindow.webContents.send('for-popup', {
                 championId: data.championId,
                 championName: data.championName,
                 augments: data.augments,
-                benchRecommendation,
                 dataSource: data.dataSource,
                 timestamp: data.timestamp,
             })
@@ -581,61 +497,13 @@ export function registerIpcHandlers(isDev: boolean): void {
             logger.info('Random test data sent to popup window', {
                 championId: data.championId,
                 augmentIds: data.augments.map((augment) => augment.id),
-                benchCandidateCount: benchRecommendation?.candidates?.length || 0,
                 durationMs: getElapsedMs(startedAt),
             })
 
-            return { success: true, data, benchRecommendation }
+            return { success: true, data }
         } catch (error) {
             logger.error('Failed to show random popup test:', error)
             sendPopupError(getErrorMessage(error))
-            return { success: false, error: getErrorMessage(error) }
-        }
-    })
-
-    ipcMain.handle('test-show-bench-recommendation', async () => {
-        const startedAt = Date.now()
-        try {
-            logger.info('[diagnostics] random bench recommendation requested for champion insight')
-
-            if (!shouldShowChampionDetails()) {
-                return { success: true, skipped: true, reason: 'champion-details-disabled' }
-            }
-
-            const recommendation = await buildRandomBenchRecommendation()
-
-            const popupWindow = await ensurePopupWindow()
-            if (!popupWindow || popupWindow.isDestroyed()) {
-                return { success: false, error: 'Popup window does not exist' }
-            }
-            if (!shouldShowChampionDetails()) {
-                return { success: true, skipped: true, reason: 'champion-details-disabled' }
-            }
-
-            applyPopupWindowLayout()
-            if (!popupWindow.isVisible()) {
-                popupWindow.show()
-            }
-
-            popupWindow.webContents.send('for-popup', {
-                championId: recommendation?.currentChampion?.championId || null,
-                championName: recommendation?.currentChampion?.name || '',
-                augments: [],
-                benchRecommendation: recommendation,
-                champSelect: true,
-                dataSource: 'champ-select',
-                timestamp: Date.now(),
-            })
-            popupWindow.webContents.send('bench-recommendation-preview', recommendation)
-            logger.info('Random bench recommendation sent to champion insight window', {
-                recommendedChampionId: recommendation?.recommendedChampion?.championId,
-                candidateCount: recommendation?.candidates?.length || 0,
-                durationMs: getElapsedMs(startedAt),
-            })
-
-            return { success: true, recommendation }
-        } catch (error) {
-            logger.error('Failed to show random bench recommendation:', error)
             return { success: false, error: getErrorMessage(error) }
         }
     })
@@ -777,104 +645,6 @@ export function registerIpcHandlers(isDev: boolean): void {
             }
         } catch (error) {
             logger.warn('[lcu] failed to clear manual League path:', getErrorMessage(error))
-            return {
-                success: false,
-                error: getErrorMessage(error),
-            }
-        }
-    })
-
-    ipcMain.handle('post-game-share-get-latest', async () => {
-        try {
-            const lcuService = getLCUServiceInstance()
-            return await getLatestPostGameSharePosterData(lcuService, 'renderer-request')
-        } catch (error) {
-            logger.warn('[post-game-share] failed to get latest poster data:', getErrorMessage(error))
-            return {
-                success: false,
-                data: null,
-                error: getErrorMessage(error),
-            }
-        }
-    })
-
-    ipcMain.handle('post-game-share-refresh', async () => {
-        try {
-            const lcuService = getLCUServiceInstance()
-            return await preparePostGameSharePosterData(lcuService, 'renderer-refresh')
-        } catch (error) {
-            logger.warn('[post-game-share] failed to refresh poster data:', getErrorMessage(error))
-            return {
-                success: false,
-                data: null,
-                error: getErrorMessage(error),
-            }
-        }
-    })
-
-    ipcMain.handle('post-game-share-create-mock', async () => {
-        try {
-            return await createMockPostGameSharePosterData()
-        } catch (error) {
-            logger.warn('[post-game-share] failed to create mock poster data:', getErrorMessage(error))
-            return {
-                success: false,
-                data: null,
-                error: getErrorMessage(error),
-            }
-        }
-    })
-
-    ipcMain.handle('post-game-share-copy-image', async (_event, dataUrl) => {
-        try {
-            getPosterPngBuffer(dataUrl)
-            const image = nativeImage.createFromDataURL(dataUrl)
-            if (image.isEmpty()) {
-                throw new Error('Poster image is empty')
-            }
-
-            clipboard.writeImage(image)
-            return { success: true }
-        } catch (error) {
-            logger.warn('[post-game-share] failed to copy poster image:', getErrorMessage(error))
-            return {
-                success: false,
-                error: getErrorMessage(error),
-            }
-        }
-    })
-
-    ipcMain.handle('post-game-share-save-image', async (event, dataUrl, suggestedFilename = 'aramgg-post-game-share.png') => {
-        try {
-            const buffer = getPosterPngBuffer(dataUrl)
-            const ownerWindow = BrowserWindow.fromWebContents(event.sender) || getMainWindow()
-            const dialogOptions = {
-                title: '保存赛后海报',
-                defaultPath: suggestedFilename,
-                filters: [
-                    { name: 'PNG 图片', extensions: ['png'] },
-                ],
-            }
-            const result = ownerWindow
-                ? await dialog.showSaveDialog(ownerWindow, dialogOptions)
-                : await dialog.showSaveDialog(dialogOptions)
-
-            if (result.canceled || !result.filePath) {
-                return {
-                    success: false,
-                    cancelled: true,
-                    reason: 'cancelled',
-                }
-            }
-
-            const filePath = getPosterSavePath(result.filePath)
-            await writeFile(filePath, buffer)
-            return {
-                success: true,
-                filePath,
-            }
-        } catch (error) {
-            logger.warn('[post-game-share] failed to save poster image:', getErrorMessage(error))
             return {
                 success: false,
                 error: getErrorMessage(error),
@@ -1068,42 +838,6 @@ export function registerIpcHandlers(isDev: boolean): void {
         return autoScreenshotService.getConfig()
     })
 
-    ipcMain.handle('item-sets-get-aram-status', async () => {
-        try {
-            const { getAramItemSetInstallStatus } = await import('../services/item-sets/item-set-installer.ts')
-            return await getAramItemSetInstallStatus()
-        } catch (error) {
-            logger.warn('[item-set] failed to read ARAM item set status:', getErrorMessage(error))
-            return {
-                success: false,
-                installed: false,
-                installedCount: 0,
-                error: getErrorMessage(error),
-            }
-        }
-    })
-
-    ipcMain.handle('item-sets-install-aram-champion', async (_event, payload) => {
-        try {
-            const { installAramItemSetForChampion } = await import('../services/item-sets/item-set-installer.ts')
-            const request = payload && typeof payload === 'object'
-                ? payload
-                : { championId: payload }
-
-            return await installAramItemSetForChampion({
-                championId: request.championId,
-                builds: request.builds,
-                championName: request.championName,
-            })
-        } catch (error) {
-            logger.error('[item-set] failed to install ARAM item set:', error)
-            return {
-                success: false,
-                error: getErrorMessage(error),
-            }
-        }
-    })
-
     ipcMain.handle('log-renderer-error', async (_event, errorData) => {
         const {
             message,
@@ -1151,42 +885,5 @@ export function registerIpcHandlers(isDev: boolean): void {
     })
 
     registerLCUIpcHandlers()
-    registerMatchHistoryIpcHandlers()
 
-    ipcMain.handle('test-database-load', async () => {
-        try {
-            const {
-                DATA_API_ORIGIN,
-                DATA_API_PREFIX,
-                loadDataApiConfig,
-                loadAugmentBase,
-                loadChampionStats,
-            } = await import('../data-loader.ts')
-            const [config, augments, championStats] = await Promise.all([
-                loadDataApiConfig(),
-                loadAugmentBase(),
-                loadChampionStats(63),
-            ])
-
-            return {
-                success: true,
-                successPath: `${DATA_API_ORIGIN}${DATA_API_PREFIX}`,
-                dataCount: augments.length,
-                dataVersion: config.dataVersion,
-                championStats,
-                resourcesPath: process.resourcesPath,
-                appDataDir: getAppDataDir(),
-                cwd: process.cwd(),
-                isDev,
-                nodeEnv: process.env.NODE_ENV,
-            }
-        } catch (error) {
-            logger.error('Remote data load test failed:', error)
-            return {
-                success: false,
-                error: getErrorMessage(error),
-                stack: error instanceof Error ? error.stack : undefined,
-            }
-        }
-    })
 }

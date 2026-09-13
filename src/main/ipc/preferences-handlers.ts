@@ -16,13 +16,11 @@ import { trustedIpcMain as ipcMain } from '../security/trusted-ipc.ts'
 const APP_LOCALE_KEY = 'app.locale'
 const RENDERER_STORE_KEYS = new Set<AppStoreKey>([
   'lastSelectedChampionId',
-  'itemSets.autoApplyAram',
   'championInsight.showDetails',
   'championInsight.hideOnGameStart',
   'championInsight.alwaysOnTop',
   'augments.showTopOverlay',
   'augments.showSidePanel',
-  'postGameShare.autoShow',
 ])
 
 function assertRendererStoreKey(key: unknown): asserts key is AppStoreKey {
