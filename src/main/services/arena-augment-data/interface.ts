@@ -11,6 +11,7 @@ import {
   findAugmentById,
   type ArenaAugmentRecord,
 } from '../../../shared/augment-dictionary.ts'
+import { opggSource, type OpggSourceOptions } from './opgg/source.ts'
 
 // Public data shape ------------------------------------------------------
 
@@ -52,9 +53,11 @@ export type ArenaAugmentSource = {
 
 const SOURCE_ENV = 'ARENA_AUGMENT_SOURCE'
 
-export function selectAugmentSource(): ArenaAugmentSource {
+export function selectAugmentSource(opts?: { opgg?: OpggSourceOptions }): ArenaAugmentSource {
   const wanted = (process.env[SOURCE_ENV] || 'mock').toLowerCase()
   switch (wanted) {
+    case 'opgg':
+      return opggSource(opts?.opgg)
     case 'communitydragon':
       return communityDragonSource()
     case 'mock':
