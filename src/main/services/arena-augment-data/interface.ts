@@ -48,6 +48,19 @@ export type AugmentStatsBundle = {
    *  records as placeholders. */
   mock: boolean
   records: AugmentPerfStat[]
+  /**
+   * Present only when the source could not produce records, explaining
+   * why. Callers should log this rather than silently showing "no data".
+   *
+   * Known values from the OP.GG source:
+   *   'unknown-champion'    — no slug for this champion id
+   *   'fetch-failed'        — HTTP error / timeout / offline
+   *   'page-shape-changed'  — page fetched but carried no augment payload,
+   *                           i.e. OP.GG changed their markup. This one
+   *                           deserves an operator-visible warning.
+   *   'no-records-after-join' — payload parsed but nothing matched the catalog
+   */
+  reason?: string | null
 }
 
 // Source pluggability ----------------------------------------------------

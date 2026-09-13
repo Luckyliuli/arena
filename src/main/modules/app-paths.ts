@@ -190,9 +190,15 @@ export function getPartialOcrScreenshotDir(): string {
     return screenshotDir
 }
 
-/** Persistent, user-local LCU match-history records and derived statistics. */
-export function getMatchHistoryDataDir(): string {
-    const matchHistoryDir = path.join(getAppDataDir(), 'match-history')
-    fs.ensureDirSync(matchHistoryDir)
-    return matchHistoryDir
+/**
+ * Cache of OP.GG arena augment data, one JSON file per champion.
+ *
+ * Fetching OP.GG costs 1–2s and the third-party site gains nothing from
+ * repeated identical requests, so the adapter reads through this. Safe to
+ * delete at any time; the next request simply re-fetches.
+ */
+export function getArenaAugmentCacheDir(): string {
+    const cacheDir = path.join(getAppDataDir(), 'arena-augment-cache')
+    fs.ensureDirSync(cacheDir)
+    return cacheDir
 }

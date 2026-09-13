@@ -11,3 +11,9 @@ export {
   type ArenaAugmentHtmlFetcher,
   type OnlineOpggFetcherOptions,
 } from './fetcher.ts'
+export {
+  fileOpggCache,
+  memoryOpggCache,
+  type OpggCache,
+  type FileOpggCacheOptions,
+} from './cache.ts'

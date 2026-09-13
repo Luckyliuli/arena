@@ -53,7 +53,7 @@
           <td v-if="!bundle || !bundle.mock" class="sample-col">{{ row.sampleSize == null ? "-" : row.sampleSize.toLocaleString() }}</td>
         </tr>
         <tr v-if="!loading && rows.length === 0">
-          <td class="empty-row" :colspan="(bundle && bundle.mock) ? 4 : 5">{{ t('arenaLeaderboard.empty') }}</td>
+          <td class="empty-row" :colspan="(bundle && bundle.mock) ? 4 : 5">{{ emptyMessage }}</td>
         </tr>
       </tbody>
     </table>
@@ -114,6 +114,21 @@ const currentRank = ref<ArenaAugmentRankOrder>('placement')
 
 const rows = computed<ArenaAugmentLeaderboardRow[]>(() => ranked.value[currentRank.value] || [])
 const currentRankLabel = computed<string>(() => t(RANK_TITLE_KEYS[currentRank.value]))
+
+// When the source returns nothing it also tells us why. Surface that
+// instead of a generic "no data" — 'page-shape-changed' in particular
+// means OP.GG moved their markup and the scraper needs updating.
+const REASON_KEYS: Record<string, string> = {
+  'unknown-champion': 'arenaLeaderboard.reasonUnknownChampion',
+  'fetch-failed': 'arenaLeaderboard.reasonFetchFailed',
+  'page-shape-changed': 'arenaLeaderboard.reasonPageShapeChanged',
+  'no-records-after-join': 'arenaLeaderboard.reasonNoRecordsAfterJoin',
+}
+const emptyMessage = computed<string>(() => {
+  const reason = bundle.value?.reason
+  if (reason && REASON_KEYS[reason]) return t(REASON_KEYS[reason])
+  return t('arenaLeaderboard.empty')
+})
 
 function rarityClass(rarity: ArenaAugmentRarity): string {
   return 'rarity-' + rarity

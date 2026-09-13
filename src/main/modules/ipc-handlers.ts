@@ -884,11 +884,32 @@ export function registerIpcHandlers(_isDev: boolean): void {
         const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 20
 
         try {
-            const { selectAugmentSource, rankAugmentStats } = await import(
+            const {
+                selectAugmentSource,
+                rankAugmentStats,
+                fileOpggCache,
+            } = await import(
                 '../services/arena-augment-data/index.ts'
             )
-            const source = selectAugmentSource()
+            const { getArenaAugmentCacheDir } = await import('./app-paths.ts')
+            // Read-through cache: OP.GG costs 1–2s per champion and gains
+            // nothing from repeated identical requests.
+            const source = selectAugmentSource({
+                opgg: { cache: fileOpggCache(getArenaAugmentCacheDir()) },
+            })
             const bundle = await source.getStatsForChampion(championId, patch ? { patch } : undefined)
+
+            // An empty bundle with a reason is a real signal, not "no data".
+            // 'page-shape-changed' in particular means OP.GG moved their
+            // markup and the scraper needs updating — surface it loudly.
+            if (bundle.reason) {
+                const level = bundle.reason === 'page-shape-changed' ? 'warn' : 'info'
+                logger[level]('[arena-augment] source returned no records', {
+                    championId,
+                    source: source.id,
+                    reason: bundle.reason,
+                })
+            }
 
             // Join with the catalog so the renderer can render rows without
             // an extra round-trip. Rows whose augment id is missing from

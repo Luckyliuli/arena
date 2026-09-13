@@ -229,6 +229,12 @@ export type ArenaAugmentStatsBundle = {
    *  flag the bundle as a placeholder. */
   mock: boolean
   records: ArenaAugmentPerfStat[]
+  /**
+   * Set only when the source produced no records, explaining why. The UI
+   * should surface this instead of a generic "no data" message —
+   * 'page-shape-changed' means the upstream scraper needs updating.
+   */
+  reason?: string | null
 }
 
 export type ArenaAugmentRarity = 'silver' | 'gold' | 'prismatic' | 'unknown'
