@@ -1,7 +1,7 @@
 {
   "name": "aramgg_client",
   "version": "0.2.17",
-  "description": "Electron companion for League of Legends ARAM recommendations and augment OCR.",
+  "description": "Windows companion for League of Legends Arena augment and prismatic-item recommendations.",
   "author": "ARAMGG",
   "private": true,
   "type": "module",

@@ -78,13 +78,6 @@ const preferenceDefinitions = [
     descriptionKey: 'preferences.topOverlayDescription',
   },
   {
-    key: 'showAugmentSidePanel',
-    storeKey: 'augments.showSidePanel',
-    defaultValue: true,
-    titleKey: 'preferences.sidePanelTitle',
-    descriptionKey: 'preferences.sidePanelDescription',
-  },
-  {
     key: 'autoApplyArenaItemSets',
     storeKey: 'itemSets.autoApplyArena',
     defaultValue: true,
@@ -136,8 +129,6 @@ const applyImmediateWindowEffect = (key, value) => {
 
   if (key === 'showAugmentTopOverlay') {
     electronAPI.windows.hideFloating()
-  } else if (key === 'showAugmentSidePanel') {
-    electronAPI.windows.hideAugmentSidePanel()
   } else if (key === 'showChampionDetails') {
     electronAPI.windows.hidePopup()
   }

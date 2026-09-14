@@ -4,6 +4,8 @@
 
 This is an Electron + Vue app built with `electron-vite`. Source code lives under `src/`:
 
+The product supports League of Legends Arena only. Read `CONTEXT.md` whenever work changes player-visible language or domain behavior, and read `docs/adr/README.md` whenever work changes data acquisition, popup shape, or distribution. Inherited ARAM implementation is migration material, not a product surface.
+
 - `src/main/`: Electron main process, window management, IPC handlers, data loading, screenshots, OCR, and LCU services.
 - `src/main/services/arena-session/`: Arena (斗魂竞技场) session detection. `arena-session-state.ts` stays pure and unit-testable; `arena-session-service.ts` wires the injected LCU reader. See `docs/GAMEFLOW_DETECTION_GUIDE.md`.
 - `src/preload/`: sandboxed preload bridge exposing `window.electronAPI`.
@@ -82,9 +84,7 @@ Arena session detection must not guess the shopping phase from gameflow `InProgr
 
 Arena augment stats default to the real OP.GG source, behind a read-through on-disk cache. ARENA_AUGMENT_SOURCE=mock|communitydragon is a dev/test override only: an unset or unrecognised value must never fall back to placeholder stats, because the popup would then present fabricated numbers as real.
 
-ARAM champ-select recommendation code must remain read-only. Do not connect `pickOrBan`, `benchSwap`, `action`, `acceptTrade`, or `declineTrade` to recommendation flows; keep executable LCU writes isolated to their existing feature areas such as rune pages.
-
-Keep ARAM champ-select recommendations in the hero detail window, not on the main renderer screen. The recommendation area should show all available candidates and remain a read-only recommendation surface.
+Inherited ARAM paths must remain read-only while they exist. Security fixes may touch them, but new product behavior belongs to the Arena domain.
 
 LCU auth discovery should remain process-first. The `lolPath` / main-window `游戏目录` setting is an advanced fallback only; do not make manual path mandatory or couple recommendations to it.
 

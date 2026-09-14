@@ -18,6 +18,7 @@
 | Product entry (English) | [README.en.md](../README.en.md) | 当前 |
 | 完整架构 | [COMPLETE_ARCHITECTURE.md](../COMPLETE_ARCHITECTURE.md) | 当前 |
 | 领域词汇 | [CONTEXT.md](../CONTEXT.md) | 当前 |
+| 架构决策 | [adr/README.md](./adr/README.md) | 当前 |
 | 仓库协作规范 | [AGENTS.md](../AGENTS.md) | 当前 |
 | AI 协作者规则 | [CLAUDE.md](../CLAUDE.md) | 当前；以 AGENTS.md 为规则源 |
 | UI 设计系统 | [DESIGN.md](../DESIGN.md) | 当前 |
@@ -60,7 +61,7 @@
 | [仓库审查（2026-09-05）](./audits/2026-09-05/repository-audit.md) | 快照 |
 | [ELECTRON_VITE_MIGRATION_PROGRESS.md](./ELECTRON_VITE_MIGRATION_PROGRESS.md) | 迁移快照；当前架构以 COMPLETE_ARCHITECTURE.md 为准 |
 | [ARAM_LCU_READONLY_RECOMMENDATION_PROGRESS.md](./ARAM_LCU_READONLY_RECOMMENDATION_PROGRESS.md) | 功能进度快照 |
-| [requirements.md](./requirements.md) | 待整理；当前内容明显是早期 ARAM 规格，尚未覆盖 Arena |
+| [requirements.md](./requirements.md) | 当前；斗魂竞技场稳定产品要求 |
 
 ## 当前状态与整理报告
 

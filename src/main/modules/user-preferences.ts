@@ -5,7 +5,6 @@ export const USER_PREFERENCE_KEYS = {
     hideChampionInsightOnGameStart: 'championInsight.hideOnGameStart',
     championInsightAlwaysOnTop: 'championInsight.alwaysOnTop',
     showAugmentTopOverlay: 'augments.showTopOverlay',
-    showAugmentSidePanel: 'augments.showSidePanel',
     autoApplyArenaItemSets: 'itemSets.autoApplyArena',
 }
 
@@ -34,10 +33,6 @@ export function shouldKeepChampionInsightOnTop(): boolean {
 
 export function shouldShowAugmentTopOverlay(): boolean {
     return getBooleanPreference(USER_PREFERENCE_KEYS.showAugmentTopOverlay, true)
-}
-
-export function shouldShowAugmentSidePanel(): boolean {
-    return getBooleanPreference(USER_PREFERENCE_KEYS.showAugmentSidePanel, true)
 }
 
 export function shouldAutoApplyArenaItemSets(): boolean {

@@ -53,7 +53,7 @@ vi.mock('../../src/main/modules/window-manager.ts', () => ({
   applyAugmentSidePanelWindowLayout: vi.fn(),
   applyFloatingWindowLayout: vi.fn(),
   raiseOverlayWindow: vi.fn(),
-  ensureAugmentOverlayWindows: mocks.prepareWindows,
+  ensureAugmentOverlayWindow: mocks.prepareWindows,
   ensureFloatingWindow: mocks.ensureFloatingWindow,
 }))
 vi.mock('../../src/main/modules/overlay-window-state.ts', () => ({

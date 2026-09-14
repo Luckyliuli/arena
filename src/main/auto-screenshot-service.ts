@@ -26,10 +26,9 @@ import fs from 'fs-extra'
 import path from 'path'
 import logger from './modules/logger.ts'
 import {
-    applyAugmentSidePanelWindowLayout,
     applyFloatingWindowLayout,
     ensureFloatingWindow,
-    ensureAugmentOverlayWindows,
+    ensureAugmentOverlayWindow,
     raiseOverlayWindow,
 } from './modules/window-manager.ts'
 import { shouldRaiseOverlayWindow } from './modules/overlay-window-state.ts'
@@ -41,10 +40,7 @@ import {
     getAugmentIds,
     mergePartialAugments,
 } from './augment-partial-merge.ts'
-import {
-    shouldShowAugmentSidePanel,
-    shouldShowAugmentTopOverlay,
-} from './modules/user-preferences.ts'
+import { shouldShowAugmentTopOverlay } from './modules/user-preferences.ts'
 
 const AUTO_SCREENSHOT_SUMMARY_INTERVAL_MS = 2 * 60 * 1000
 const ANALYSIS_MISS_LOG_INTERVAL_MS = 60 * 1000
@@ -1414,7 +1410,7 @@ class AutoScreenshotService {
                 const level = bundle.reason === 'page-shape-changed' ? 'warn' : 'info'
                 logger[level]('[arena-augment] recommendation source returned no records', {
                     championId,
-                    source: source.id,
+                    source: bundle.source,
                     reason: bundle.reason,
                 })
             }
@@ -1455,7 +1451,7 @@ class AutoScreenshotService {
         try {
             if (!this.isRunning || !this._isCurrentAugmentPayload(winrateData)) return
             const runId = this.runId
-            await ensureAugmentOverlayWindows()
+            await ensureAugmentOverlayWindow()
             if (!this.isRunning || runId !== this.runId || !this._isCurrentAugmentPayload(winrateData)) return
             if (this._isManualHiddenAugmentSuppressed(winrateData)) {
                 return
@@ -1466,10 +1462,6 @@ class AutoScreenshotService {
             const floatingWindow = windows.find(win => {
                 const url = win.webContents.getURL()
                 return url.includes('floating-overlay')
-            })
-            const sidePanelWindow = windows.find(win => {
-                const url = win.webContents.getURL()
-                return url.includes('augment-side-panel')
             })
             let sentToOverlay = false
 
@@ -1484,18 +1476,6 @@ class AutoScreenshotService {
                 sentToOverlay = true
             } else if (floatingWindow && !floatingWindow.isDestroyed() && floatingWindow.isVisible() && !shouldShowAugmentTopOverlay()) {
                 floatingWindow.hide()
-            }
-
-            if (sidePanelWindow && !sidePanelWindow.isDestroyed() && shouldShowAugmentSidePanel()) {
-                if (shouldRaiseOverlayWindow(sidePanelWindow)) {
-                    applyAugmentSidePanelWindowLayout()
-                    logger.info('✨ 显示海克斯右侧推荐列表')
-                    raiseOverlayWindow(sidePanelWindow, 'augment-side-panel')
-                }
-                sidePanelWindow.webContents.send('augment-detected', winrateData)
-                sentToOverlay = true
-            } else if (sidePanelWindow && !sidePanelWindow.isDestroyed() && sidePanelWindow.isVisible() && !shouldShowAugmentSidePanel()) {
-                sidePanelWindow.hide()
             }
 
             if (!sentToOverlay && shouldShowAugmentTopOverlay()) {
@@ -1540,18 +1520,20 @@ class AutoScreenshotService {
 
     async _getArenaItemSource() {
         if (!this.arenaItemSource) {
-            const { fileOpggItemCache, opggItemSource } = await import('./services/arena-augment-data/index.ts')
-            const { getArenaAugmentCacheDir } = await import('./modules/app-paths.ts')
-            this.arenaItemSource = opggItemSource({ cache: fileOpggItemCache(getArenaAugmentCacheDir()) })
+            const { getArenaRecommendationRuntime } = await import('./services/arena-augment-data/index.ts')
+            this.arenaItemSource = {
+                getItemsForChampion: championId => getArenaRecommendationRuntime().getItemStats(championId),
+            }
         }
         return this.arenaItemSource
     }
 
     async _getArenaAugmentSource() {
         if (!this.arenaAugmentSource) {
-            const { fileOpggCache, selectAugmentSource } = await import('./services/arena-augment-data/index.ts')
-            const { getArenaAugmentCacheDir } = await import('./modules/app-paths.ts')
-            this.arenaAugmentSource = selectAugmentSource({ opgg: { cache: fileOpggCache(getArenaAugmentCacheDir()) } })
+            const { getArenaRecommendationRuntime } = await import('./services/arena-augment-data/index.ts')
+            this.arenaAugmentSource = {
+                getStatsForChampion: (championId, options) => getArenaRecommendationRuntime().getAugmentStats(championId, options),
+            }
         }
         return this.arenaAugmentSource
     }
@@ -1860,21 +1842,10 @@ class AutoScreenshotService {
                 logger.debug('Hidden augment floating window after selection disappeared')
             }
 
-            const sidePanelWindow = windows.find(win => {
-                const url = win.webContents.getURL()
-                return url.includes('augment-side-panel')
-            })
-            const wasSidePanelWindowVisible = !!sidePanelWindow && !sidePanelWindow.isDestroyed() && sidePanelWindow.isVisible()
-            if (wasSidePanelWindowVisible) {
-                sidePanelWindow.hide()
-                logger.debug('Hidden augment side panel window after selection disappeared')
-            }
-
             logger.debug('Augment clear notification sent', {
                 reason,
                 windowCount: windows.length,
                 floatingWindowWasVisible: wasFloatingWindowVisible,
-                sidePanelWindowWasVisible: wasSidePanelWindowVisible,
             })
         } catch (error) {
             logger.error('Failed to notify augment cleared:', error)

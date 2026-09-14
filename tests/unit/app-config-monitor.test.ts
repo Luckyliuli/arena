@@ -121,12 +121,13 @@ describe('main-process monitoring ownership', () => {
     expect(mocks.popup.show).not.toHaveBeenCalled()
   })
 
-  it('prepares all four windows at startup without showing champion details', async () => {
+  it('prepares the supported windows at startup without showing champion details', async () => {
     await start()
     expect(mocks.createMain).toHaveBeenCalledOnce()
-    for (const prepare of [mocks.ensurePopup, mocks.ensureFloating, mocks.ensureSidePanel]) {
+    for (const prepare of [mocks.ensurePopup, mocks.ensureFloating]) {
       expect(prepare).toHaveBeenCalledOnce()
     }
+    expect(mocks.ensureSidePanel).not.toHaveBeenCalled()
     expect(mocks.popup.show).not.toHaveBeenCalled()
     expect(mocks.popup.webContents.send).not.toHaveBeenCalled()
   })
@@ -152,7 +153,7 @@ describe('main-process monitoring ownership', () => {
     await vi.advanceTimersByTimeAsync(6000)
     expect(mocks.ensurePopup).toHaveBeenCalledOnce()
     expect(mocks.ensureFloating).toHaveBeenCalledOnce()
-    expect(mocks.ensureSidePanel).toHaveBeenCalledOnce()
+    expect(mocks.ensureSidePanel).not.toHaveBeenCalled()
     expect(mocks.phase).not.toHaveBeenCalled()
     ready({})
     await starting

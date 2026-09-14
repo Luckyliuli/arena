@@ -39,7 +39,7 @@ describe('real renderer facade and preload bridge', () => {
     }
   })
 
-  it.each(['popup', 'floating', 'augment-side-panel'])('releases the %s readiness gate through the real bridge', async () => {
+  it.each(['popup', 'floating'])('releases the %s readiness gate through the real bridge', async () => {
     const contents = new EventEmitter() as unknown as WebContents
     ipc.send.mockImplementation((channel) => {
       if (channel === 'renderer-ready') markRendererReady(contents)

@@ -9,7 +9,7 @@ describe('champion insight lifecycle', () => {
     ])
     const popupWindowBlock = windowManager.slice(
       windowManager.indexOf('export const createPopupWindow'),
-      windowManager.indexOf('export const createAugmentSidePanelWindow'),
+      windowManager.indexOf('export const createFloatingWindow'),
     )
     const inProgressRecoveryBlock = appConfig.slice(
       appConfig.indexOf('async function recoverChampionInsightForInProgress'),
@@ -27,7 +27,7 @@ describe('champion insight lifecycle', () => {
     expect(inProgressRecoveryBlock).toContain('applyPopupWindowPreferences()')
   })
 
-  it('leaves champion window visibility to the main process while preserving side-panel dismissal', async () => {
+  it('leaves champion window visibility to the main process', async () => {
     const [overlaySource, screenshotService, preferences] = await Promise.all([
       readFile(
         new URL('../../src/renderer/components/AugmentWinrateOverlay.vue', import.meta.url),
@@ -43,9 +43,7 @@ describe('champion insight lifecycle', () => {
     )
 
     expect(overlay).toContain('<div class="window-controls">')
-    expect(overlay).toContain('<button v-if="isSidePanel" class="window-control"')
     expect(overlay).toContain('<button class="window-control danger" type="button" :aria-label="t(\'common.close\')" @click="closeOverlay(\'manual\')">')
-    expect(overlay).toContain("if (isSidePanel.value) {\n      closeOverlay('augment-cleared')")
     expect(overlay).toContain("game-started received; champion insight visibility handled by main process")
     expect(overlay).toContain("game-in-progress received; champion insight visibility handled by main process")
     expect(augmentClearedBlock).not.toContain("url.includes('augment-overlay')")

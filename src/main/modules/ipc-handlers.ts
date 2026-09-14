@@ -6,13 +6,11 @@ import autoScreenshotService from '../auto-screenshot-service.ts'
 import { registerLCUIpcHandlers } from '../services/lcu/ipc-handlers.ts'
 import { getLCUServiceInstance } from '../services/lcu/lcu-service.ts'
 import {
-    applyAugmentSidePanelWindowLayout,
     applyFloatingWindowLayout,
     applyPopupWindowLayout,
-    getAugmentSidePanelWindow,
     ensurePopupWindow,
     ensureFloatingWindow,
-    ensureAugmentOverlayWindows,
+    ensureAugmentOverlayWindow,
     getFloatingWindow,
     getMainWindow,
     getPopupWindow,
@@ -24,7 +22,6 @@ import { markRendererReady } from './renderer-ready.ts'
 import store from './app-store.ts'
 import {
     shouldShowChampionDetails,
-    shouldShowAugmentSidePanel,
     shouldShowAugmentTopOverlay,
 } from './user-preferences.ts'
 import {
@@ -315,15 +312,13 @@ async function buildRandomArenaItemPreviewData(context = 'random-arena-item-prev
     if (!champions.length) throw new Error('No champion data available')
 
     const {
-        fileOpggItemCache,
-        opggItemSource,
+        getArenaRecommendationRuntime,
         recommendArenaItemCandidates,
     } = await import('../services/arena-augment-data/index.ts')
-    const { getArenaAugmentCacheDir } = await import('./app-paths.ts')
-    const source = opggItemSource({ cache: fileOpggItemCache(getArenaAugmentCacheDir()) })
+    const runtime = getArenaRecommendationRuntime()
 
     for (const champion of sampleItems(champions, Math.min(champions.length, 12))) {
-        const bundle = await source.getItemsForChampion(Number(champion.championId))
+        const bundle = await runtime.getItemStats(Number(champion.championId))
         const candidates = bundle.categories.prismatic.slice(0, 3).map((row, index) => ({
             itemId: row.items[0]?.itemId ?? null,
             name: row.items[0]?.name || '',
@@ -437,27 +432,14 @@ export function registerIpcHandlers(_isDev: boolean): void {
         })
     })
 
-    ipcMain.on('hide-augment-side-panel', async (_event, reason = 'renderer') => {
-        suppressManualAugmentOverlayReshow(reason, 'hide-augment-side-panel')
-        const sidePanelWindow = getAugmentSidePanelWindow()
-        if (sidePanelWindow && !sidePanelWindow.isDestroyed() && sidePanelWindow.isVisible()) {
-            sidePanelWindow.hide()
-        }
-        logger.debug('Augment side panel hide processed', {
-            reason,
-            windowExists: !!sidePanelWindow && !sidePanelWindow.isDestroyed(),
-            visibleAfter: !!sidePanelWindow && !sidePanelWindow.isDestroyed() && sidePanelWindow.isVisible(),
-        })
-    })
-
     ipcMain.handle('test-show-floating', async (_event, data) => {
         try {
-            if (!shouldShowAugmentTopOverlay() && !shouldShowAugmentSidePanel()) {
+            if (!shouldShowAugmentTopOverlay()) {
                 return { success: true, skipped: true, reason: 'augment-overlays-disabled' }
             }
-            const [floatingWindow, sidePanelWindow] = await ensureAugmentOverlayWindows()
+            const floatingWindow = await ensureAugmentOverlayWindow()
 
-            if ((!floatingWindow || floatingWindow.isDestroyed()) && (!sidePanelWindow || sidePanelWindow.isDestroyed())) {
+            if (!floatingWindow || floatingWindow.isDestroyed()) {
                 logger.error('Augment overlay windows do not exist')
                 return { success: false, error: 'Augment overlay windows do not exist' }
             }
@@ -469,15 +451,6 @@ export function registerIpcHandlers(_isDev: boolean): void {
                     raiseOverlayWindow(floatingWindow, 'floating')
                 }
                 floatingWindow.webContents.send('augment-detected', data)
-            }
-
-            if (sidePanelWindow && !sidePanelWindow.isDestroyed() && shouldShowAugmentSidePanel()) {
-                if (shouldRaiseOverlayWindow(sidePanelWindow)) {
-                    applyAugmentSidePanelWindowLayout()
-                    logger.info('Augment side panel window shown for test')
-                    raiseOverlayWindow(sidePanelWindow, 'augment-side-panel')
-                }
-                sidePanelWindow.webContents.send('augment-detected', data)
             }
 
             logger.info('Test data sent to floating window')
@@ -520,12 +493,12 @@ export function registerIpcHandlers(_isDev: boolean): void {
         try {
             logger.info('[diagnostics] random floating test requested')
             const data = await buildRandomAugmentPreviewData('random-floating-test')
-            if (!shouldShowAugmentTopOverlay() && !shouldShowAugmentSidePanel()) {
+            if (!shouldShowAugmentTopOverlay()) {
                 return { success: true, skipped: true, reason: 'augment-overlays-disabled' }
             }
-            const [floatingWindow, sidePanelWindow] = await ensureAugmentOverlayWindows()
+            const floatingWindow = await ensureAugmentOverlayWindow()
 
-            if ((!floatingWindow || floatingWindow.isDestroyed()) && (!sidePanelWindow || sidePanelWindow.isDestroyed())) {
+            if (!floatingWindow || floatingWindow.isDestroyed()) {
                 logger.error('Augment overlay windows do not exist')
                 return { success: false, error: 'Augment overlay windows do not exist' }
             }
@@ -537,15 +510,6 @@ export function registerIpcHandlers(_isDev: boolean): void {
                     raiseOverlayWindow(floatingWindow, 'floating')
                 }
                 floatingWindow.webContents.send('augment-detected', data)
-            }
-
-            if (sidePanelWindow && !sidePanelWindow.isDestroyed() && shouldShowAugmentSidePanel()) {
-                if (shouldRaiseOverlayWindow(sidePanelWindow)) {
-                    applyAugmentSidePanelWindowLayout()
-                    logger.info('Augment side panel window shown for random test')
-                    raiseOverlayWindow(sidePanelWindow, 'augment-side-panel')
-                }
-                sidePanelWindow.webContents.send('augment-detected', data)
             }
 
             logger.info('Random test data sent to floating window', {
@@ -990,19 +954,13 @@ export function registerIpcHandlers(_isDev: boolean): void {
 
         try {
             const {
-                selectAugmentSource,
+                getArenaRecommendationRuntime,
                 rankAugmentStats,
-                fileOpggCache,
             } = await import(
                 '../services/arena-augment-data/index.ts'
             )
-            const { getArenaAugmentCacheDir } = await import('./app-paths.ts')
-            // Read-through cache: OP.GG costs 1–2s per champion and gains
-            // nothing from repeated identical requests.
-            const source = selectAugmentSource({
-                opgg: { cache: fileOpggCache(getArenaAugmentCacheDir()) },
-            })
-            const bundle = await source.getStatsForChampion(championId, patch ? { patch } : undefined)
+            const runtime = getArenaRecommendationRuntime()
+            const bundle = await runtime.getAugmentStats(championId, patch ? { patch } : undefined)
 
             // An empty bundle with a reason is a real signal, not "no data".
             // 'page-shape-changed' in particular means OP.GG moved their
@@ -1011,7 +969,7 @@ export function registerIpcHandlers(_isDev: boolean): void {
                 const level = bundle.reason === 'page-shape-changed' ? 'warn' : 'info'
                 logger[level]('[arena-augment] source returned no records', {
                     championId,
-                    source: source.id,
+                    source: bundle.source,
                     reason: bundle.reason,
                 })
             }
@@ -1045,7 +1003,7 @@ export function registerIpcHandlers(_isDev: boolean): void {
 
             logger.info('[arena-augment] stats served', {
                 championId,
-                source: source.id,
+                source: bundle.source,
                 patch: patch || 'current',
                 recordCount: bundle.records.length,
                 joinedCount: records.length,
@@ -1056,7 +1014,7 @@ export function registerIpcHandlers(_isDev: boolean): void {
                 success: true,
                 bundle,
                 ranked,
-                sourceLabel: source.label,
+                sourceLabel: bundle.source === 'opgg' ? 'OP.GG' : bundle.source,
             }
         } catch (error) {
             logger.error('[arena-augment] stats failed:', error)
@@ -1109,31 +1067,27 @@ export function registerIpcHandlers(_isDev: boolean): void {
         }
 
         try {
-            const { opggItemSource, fileOpggItemCache } = await import('../services/arena-augment-data/index.ts')
-            const { getArenaAugmentCacheDir } = await import('./app-paths.ts')
-            const source = opggItemSource({
-                cache: fileOpggItemCache(getArenaAugmentCacheDir()),
-            })
-            const bundle = await source.getItemsForChampion(championId)
+            const { getArenaRecommendationRuntime } = await import('../services/arena-augment-data/index.ts')
+            const bundle = await getArenaRecommendationRuntime().getItemStats(championId)
             const recordCount = Object.values(bundle.categories).reduce((count, rows) => count + rows.length, 0)
 
             if (bundle.reason) {
                 const level = bundle.reason === 'page-shape-changed' ? 'warn' : 'info'
                 logger[level]('[arena-item] source returned no records', {
                     championId,
-                    source: source.id,
+                    source: bundle.source,
                     reason: bundle.reason,
                 })
             } else {
                 logger.info('[arena-item] stats served', {
                     championId,
-                    source: source.id,
+                    source: bundle.source,
                     recordCount,
                     durationMs: getElapsedMs(startedAt),
                 })
             }
 
-            return { success: true, bundle, sourceLabel: source.label }
+            return { success: true, bundle, sourceLabel: bundle.source === 'opgg' ? 'OP.GG' : bundle.source }
         } catch (error) {
             logger.error('[arena-item] stats failed:', error)
             return { success: false, error: getErrorMessage(error) }

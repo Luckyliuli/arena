@@ -3,15 +3,12 @@ import { app, globalShortcut, BrowserWindow } from 'electron'
 import { getLolGameStatus } from '../screenshot.ts'
 import { registerIpcHandlers } from './ipc-handlers.ts'
 import {
-    applyAugmentSidePanelWindowLayout,
     applyFloatingWindowLayout,
     applyPopupWindowLayout,
     createMainWindow,
     ensurePopupWindow,
     ensureFloatingWindow,
-    ensureAugmentSidePanelWindow,
     toggleMainWindow,
-    getAugmentSidePanelWindow,
     getFloatingWindow,
     getPopupWindow,
     raiseOverlayWindow,
@@ -47,7 +44,6 @@ import { createAppTray } from './tray.ts'
 import {
     shouldAutoApplyArenaItemSets,
     shouldShowChampionDetails,
-    shouldShowAugmentSidePanel,
     shouldShowAugmentTopOverlay,
 } from './user-preferences.ts'
 import { GameSessionCoordinator } from '../services/game-session/game-session-machine.ts'
@@ -156,17 +152,15 @@ export async function init({ startBackgroundServices = true } = {}) {
     }
 
     const mainWindow = await createMainWindow(isDev, devServerUrl)
-    const [popupWindow, floatingWindow, augmentSidePanelWindow] = await Promise.all([
+    const [popupWindow, floatingWindow] = await Promise.all([
         ensurePopupWindow(),
         ensureFloatingWindow(),
-        ensureAugmentSidePanelWindow(),
     ])
     createAppTray()
     logger.info('窗口已创建:', {
         main: !!mainWindow,
         popup: !!popupWindow,
         floating: !!floatingWindow,
-        augmentSidePanel: !!augmentSidePanelWindow,
         tray: true,
     })
     // Release smoke still uses real IPC, packaged assets, windows and tray.
@@ -667,17 +661,14 @@ async function ensureArenaItemSetInjection(lcuService, championId, reason) {
             }
 
             const [
-                { fileOpggItemCache, injectArenaItemSet, opggItemSource },
+                { getArenaRecommendationRuntime, injectArenaItemSet },
                 { loadChampionName },
-                { getArenaAugmentCacheDir },
             ] = await Promise.all([
                 import('../services/arena-augment-data/index.ts'),
                 import('../data-loader.ts'),
-                import('./app-paths.ts'),
             ])
-            const source = opggItemSource({ cache: fileOpggItemCache(getArenaAugmentCacheDir()) })
             const [bundle, championName] = await Promise.all([
-                source.getItemsForChampion(championId),
+                getArenaRecommendationRuntime().getItemStats(championId),
                 loadChampionName(championId),
             ])
             if (bundle.reason) {
@@ -1417,7 +1408,6 @@ async function notifyAllWindows(channel, data) {
     // 如果是海克斯检测事件，找到并显示浮动窗口
     if (channel === 'augment-detected') {
         const floatingWin = getFloatingWindow()
-        const sidePanelWin = getAugmentSidePanelWindow()
         let sentToOverlay = false
 
         if (floatingWin && !floatingWin.isDestroyed() && shouldShowAugmentTopOverlay()) {
@@ -1431,18 +1421,6 @@ async function notifyAllWindows(channel, data) {
             sentToOverlay = true
         } else if (floatingWin && !floatingWin.isDestroyed() && floatingWin.isVisible() && !shouldShowAugmentTopOverlay()) {
             floatingWin.hide()
-        }
-
-        if (sidePanelWin && !sidePanelWin.isDestroyed() && shouldShowAugmentSidePanel()) {
-            if (shouldRaiseOverlayWindow(sidePanelWin)) {
-                applyAugmentSidePanelWindowLayout()
-                logger.info('✨ 显示海克斯右侧推荐列表')
-                raiseOverlayWindow(sidePanelWin, 'augment-side-panel')
-            }
-            sidePanelWin.webContents.send(channel, data)
-            sentToOverlay = true
-        } else if (sidePanelWin && !sidePanelWin.isDestroyed() && sidePanelWin.isVisible() && !shouldShowAugmentSidePanel()) {
-            sidePanelWin.hide()
         }
 
         if (sentToOverlay) {

@@ -5,7 +5,7 @@ import http from 'node:http'
 import https from 'node:https'
 import { syncBuiltinESMExports } from 'node:module'
 
-const ROUTES = ['/display', '/augment-overlay', '/floating-overlay', '/augment-side-panel']
+const ROUTES = ['/display', '/augment-overlay', '/floating-overlay']
 const OFFLINE_ERROR = 'Release smoke: external network disabled'
 
 /** Observe the real packaged startup; never synthesize renderer-ready or replace IPC. */

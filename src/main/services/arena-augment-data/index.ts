@@ -66,3 +66,10 @@ export { matchArenaItemNames, matchArenaItemSlotTexts } from './itemMatcher.ts'
 
 export { buildArenaItemSet, type ArenaItemSet } from './arenaItemSet.ts'
 export { injectArenaItemSet, type ArenaItemSetSyncResult } from './arenaItemSetInjection.ts'
+
+export {
+  createArenaRecommendationRuntime,
+  getArenaRecommendationRuntime,
+  type ArenaItemSource,
+  type ArenaRecommendationRuntime,
+} from './runtime.ts'

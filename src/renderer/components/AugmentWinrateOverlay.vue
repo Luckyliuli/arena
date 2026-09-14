@@ -825,11 +825,7 @@ const closeOverlay = (reason = 'manual') => {
   displayAugments.value = []
   hideAugmentTooltip()
 
-  if (isSidePanel.value) {
-    electronAPI.windows.hideAugmentSidePanel(reason)
-  } else {
-    electronAPI.windows.hidePopup(reason)
-  }
+  electronAPI.windows.hidePopup(reason)
 }
 
 const withClientUtm = (url) => {

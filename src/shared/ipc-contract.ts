@@ -8,7 +8,6 @@ export type AppStoreKey =
   | 'championInsight.hideOnGameStart'
   | 'championInsight.alwaysOnTop'
   | 'augments.showTopOverlay'
-  | 'augments.showSidePanel'
   | 'itemSets.autoApplyArena'
 
 export type SupportedDataLocale = 'zh-CN' | 'zh-TW' | 'en-US'
@@ -468,7 +467,6 @@ export interface ElectronAPI {
     showPopup(data: OverlayPayload): void
     hidePopup(reason?: string): void
     hideFloating(reason?: string): void
-    hideAugmentSidePanel(reason?: string): void
     toggleMain(): void
     confirmQuit(): Promise<OperationResult>
     restart(): void

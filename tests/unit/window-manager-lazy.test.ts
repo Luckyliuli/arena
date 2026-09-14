@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ windows: [] as any[], top: true, side: true }))
+const mocks = vi.hoisted(() => ({ windows: [] as any[], top: true }))
 vi.mock('electron', async () => {
   const { EventEmitter } = await import('node:events')
   class Window extends EventEmitter {
@@ -37,14 +37,12 @@ vi.mock('../../src/main/modules/user-preferences.ts', () => ({
   shouldHideChampionInsightOnGameStart: () => true,
   shouldKeepChampionInsightOnTop: () => false,
   shouldShowAugmentTopOverlay: () => mocks.top,
-  shouldShowAugmentSidePanel: () => mocks.side,
 }))
 
 beforeEach(() => {
   vi.resetModules()
   mocks.windows.length = 0
   mocks.top = true
-  mocks.side = true
 })
 afterEach(() => {
   for (const window of mocks.windows) if (!window.isDestroyed()) window.destroy()
@@ -69,30 +67,26 @@ describe('auxiliary window loading', () => {
     expect(mocks.windows).toHaveLength(1)
   })
 
-  it('prepares all auxiliary windows while hidden and reuses them when enabled', async () => {
+  it('prepares the supported auxiliary windows while hidden and reuses the top popup', async () => {
     mocks.top = false
-    mocks.side = false
     const manager = await import('../../src/main/modules/window-manager.ts')
     const { markRendererReady } = await import('../../src/main/modules/renderer-ready.ts')
     const loading = Promise.all([
       manager.ensurePopupWindow(),
       manager.ensureFloatingWindow(),
-      manager.ensureAugmentSidePanelWindow(),
     ])
     await Promise.resolve()
-    expect(mocks.windows).toHaveLength(3)
+    expect(mocks.windows).toHaveLength(2)
     for (const window of mocks.windows) {
       expect(window.options.show).toBe(false)
       markRendererReady(window.webContents)
     }
-    const [popup, floating, sidePanel] = await loading
+    const [popup, floating] = await loading
     expect(floating.webContents.getURL()).toContain('#/floating-overlay')
-    expect(sidePanel.webContents.getURL()).toContain('#/augment-side-panel')
-    expect(await manager.ensureAugmentOverlayWindows()).toEqual([null, null])
+    expect(await manager.ensureAugmentOverlayWindow()).toBeNull()
     mocks.top = true
-    mocks.side = true
     expect(await manager.ensurePopupWindow()).toBe(popup)
-    expect(await manager.ensureAugmentOverlayWindows()).toEqual([floating, sidePanel])
-    expect(mocks.windows).toHaveLength(3)
+    expect(await manager.ensureAugmentOverlayWindow()).toBe(floating)
+    expect(mocks.windows).toHaveLength(2)
   })
 })

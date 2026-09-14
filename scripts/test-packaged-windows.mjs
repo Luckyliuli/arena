@@ -52,13 +52,13 @@ try {
   } catch (error) {
     throw new Error(`Packaged app produced no valid report: exit=${code}, timeout=${timedOut}. See ${output}/stderr.log`, { cause: error })
   }
-  const expectedRoutes = ['#/display', '#/augment-overlay', '#/floating-overlay', '#/augment-side-panel']
+  const expectedRoutes = ['#/display', '#/augment-overlay', '#/floating-overlay']
   if (timedOut || code !== 0 || !report.passed || !report.packaged ||
-      report.platform !== process.platform || report.windows?.length !== 4 ||
+      report.platform !== process.platform || report.windows?.length !== expectedRoutes.length ||
       expectedRoutes.some((route) => !report.windows.some((window) => window.route === route))) {
     throw new Error(`Packaged smoke failed: exit=${code}, timeout=${timedOut}\n${JSON.stringify(report, null, 2)}`)
   }
-  console.log(`Packaged ${report.platform} ${report.version}: all four windows ready in ${report.durationMs}ms`)
+  console.log(`Packaged ${report.platform} ${report.version}: all expected windows ready in ${report.durationMs}ms`)
   console.log(`Report and screenshots: ${output}`)
 } finally {
   await writeFile(path.join(output, 'stdout.log'), stdout)

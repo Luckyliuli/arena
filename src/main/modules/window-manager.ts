@@ -27,7 +27,6 @@ import {
     shouldHideChampionInsightOnGameStart,
     shouldKeepChampionInsightOnTop,
     shouldShowChampionDetails,
-    shouldShowAugmentSidePanel,
     shouldShowAugmentTopOverlay,
 } from './user-preferences.ts'
 import type { GameflowPhase } from '../../shared/ipc-contract.ts'
@@ -52,7 +51,6 @@ let mainWindow: BrowserWindow | null = null
 let popupWindow: BrowserWindow | null = null
 let popupGameflowPhase: GameflowPhase | null = null
 let floatingWindow: BrowserWindow | null = null
-let augmentSidePanelWindow: BrowserWindow | null = null
 let mainWindowCloseAllowed = false
 let rendererServerPromise: Promise<string> | null = null
 
@@ -60,7 +58,6 @@ const MAIN_WINDOW_SIZE = { width: 472, height: 752 }
 const POPUP_WINDOW_SIZE = { width: 360, height: 640 }
 const POPUP_WINDOW_POSITION_KEY = 'windows.championInsightPosition'
 const FLOATING_WINDOW_SIZE = { width: 760, height: 170 }
-const AUGMENT_SIDE_PANEL_WINDOW_SIZE = { width: 360, height: 640 }
 const OVERLAY_ALWAYS_ON_TOP_LEVEL = process.platform === 'win32' ? 'screen-saver' : 'floating'
 const MIME_TYPES: Record<string, string> = {
     '.html': 'text/html; charset=utf-8',
@@ -150,20 +147,6 @@ function getFloatingBounds(): Rectangle {
     }
 }
 
-function getAugmentSidePanelBounds(): Rectangle {
-    const display = screen.getPrimaryDisplay()
-    const area = display.workArea || display.bounds
-    const width = Math.min(AUGMENT_SIDE_PANEL_WINDOW_SIZE.width, area.width)
-    const height = Math.min(AUGMENT_SIDE_PANEL_WINDOW_SIZE.height, area.height)
-
-    return {
-        width,
-        height,
-        x: area.x + area.width - width - 16,
-        y: area.y + Math.max(16, Math.round((area.height - height) / 2)),
-    }
-}
-
 export function applyPopupWindowLayout() {
     if (popupWindow && !popupWindow.isDestroyed()) {
         if (popupWindow.isVisible()) {
@@ -179,15 +162,6 @@ export function applyFloatingWindowLayout() {
             return
         }
         floatingWindow.setBounds(getFloatingBounds())
-    }
-}
-
-export function applyAugmentSidePanelWindowLayout() {
-    if (augmentSidePanelWindow && !augmentSidePanelWindow.isDestroyed()) {
-        if (augmentSidePanelWindow.isVisible()) {
-            return
-        }
-        augmentSidePanelWindow.setBounds(getAugmentSidePanelBounds())
     }
 }
 
@@ -554,10 +528,6 @@ export const createMainWindow = async (
             logger.info('Closing floating window...')
             floatingWindow.close()
         }
-        if (augmentSidePanelWindow && !augmentSidePanelWindow.isDestroyed()) {
-            logger.info('Closing augment side panel window...')
-            augmentSidePanelWindow.close()
-        }
     })
 
     window.on('closed', () => {
@@ -625,57 +595,6 @@ export const createPopupWindow = async (
 }
 
 /**
- * 创建游戏右侧海克斯推荐列表窗口
- */
-export const createAugmentSidePanelWindow = async (
-    isDev: boolean,
-    devServerUrl: string
-): Promise<BrowserWindow> => {
-    const webPreferences = getWebPreferences(isDev)
-    const bounds = getAugmentSidePanelBounds()
-
-    augmentSidePanelWindow = new BrowserWindow({
-        show: false,
-        frame: false,
-        transparent: true,
-        skipTaskbar: true,
-        resizable: isDev || false,
-        fullscreenable: false,
-        alwaysOnTop: true,
-        focusable: true,
-        ...bounds,
-        webPreferences,
-    })
-    setOverlayAlwaysOnTop(augmentSidePanelWindow, true, 'augment-side-panel')
-    attachWindowDiagnostics('augment-side-panel', augmentSidePanelWindow)
-
-    augmentSidePanelWindow.on('closed', () => {
-        logger.info('Augment side panel window closed')
-        augmentSidePanelWindow = null
-    })
-
-    await loadRendererRoute(
-        augmentSidePanelWindow,
-        'augment-side-panel',
-        isDev,
-        devServerUrl,
-        '/augment-side-panel',
-        webPreferences.preload
-    )
-
-    if (isDev && OPEN_OVERLAY_DEVTOOLS) {
-        augmentSidePanelWindow.webContents.openDevTools({ mode: 'detach' })
-    }
-
-    logger.info('海克斯右侧推荐列表窗口已创建', {
-        ...bounds,
-        url: augmentSidePanelWindow.webContents.getURL(),
-    })
-
-    return augmentSidePanelWindow
-}
-
-/**
  * 创建透明浮动窗口（用于游戏内显示海克斯推荐）
  * 【重要】窗口位置在屏幕顶部(2%)，确保不与OCR识别区域(从25%开始)重叠
  */
@@ -739,7 +658,6 @@ export const getPopupWindow = () => popupWindow
  */
 export const getFloatingWindow = () => floatingWindow
 
-export const getAugmentSidePanelWindow = () => augmentSidePanelWindow
 
 function getRendererRuntime(): [boolean, string] {
     const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
@@ -754,16 +672,8 @@ export const ensureFloatingWindow = createWindowLoader(
     getFloatingWindow,
     () => createFloatingWindow(...getRendererRuntime()),
 )
-export const ensureAugmentSidePanelWindow = createWindowLoader(
-    getAugmentSidePanelWindow,
-    () => createAugmentSidePanelWindow(...getRendererRuntime()),
-)
-
-export function ensureAugmentOverlayWindows(): Promise<[BrowserWindow | null, BrowserWindow | null]> {
-    return Promise.all([
-        shouldShowAugmentTopOverlay() ? ensureFloatingWindow() : null,
-        shouldShowAugmentSidePanel() ? ensureAugmentSidePanelWindow() : null,
-    ])
+export function ensureAugmentOverlayWindow(): Promise<BrowserWindow | null> {
+    return shouldShowAugmentTopOverlay() ? ensureFloatingWindow() : Promise.resolve(null)
 }
 
 export function notifyAllWindows(channel: string, data: unknown): void {

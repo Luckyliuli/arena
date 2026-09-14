@@ -1,39 +1,69 @@
-# ARAMGG Client
+# 斗魂竞技场助手
 
-ARAMGG Client is a desktop companion for League of Legends ARAM. Its user-facing surfaces provide recommendations and controls without changing champion-selection actions.
+本项目是面向《英雄联盟》斗魂竞技场的 Windows 桌面助手。核心能力是在采购阶段识别三个强化符文或棱彩装备候选，并给出只读推荐。
 
 ## Language
 
-**ARAMGG Assistant**:
-The main application window where users view status and configure preferences.
-_Avoid_: Champion Details, overlay
+**斗魂竞技场（Arena）**:
+《英雄联盟》的回合制对战模式：8 支队伍各 2 人，经多个回合对战，按最终名次结算。本项目唯一面向的游戏模式。
+_避免_: 竞技场、Arena 模式、极地大乱斗、ARAM
 
-**Champion Details window**:
-A separate window that presents the selected champion's recommendations and ARAM bench context. Whether it is visible is independent from champion monitoring and other background features.
-_Avoid_: Champion Details page, augment popup, main page
+**队伍（Subteam）**:
+斗魂中共享名次的 2 人单位。强度统计按队伍聚合，客户端字段为 `playerSubteamId`。
+_避免_: 双人组、小队、搭档、team
 
-**Champion Details visibility**:
-A user preference that controls only whether the **Champion Details window** is displayed. It does not enable or disable champion monitoring, augment recognition, item-set behavior, or post-game data capture.
-_Avoid_: Champion monitoring switch, OCR switch
+**回合（Round）**:
+斗魂中的一轮战斗。队伍在回合之间购买装备、选取强化符文。
+_避免_: 局、盘、轮次、stage
 
-**Automatic capture stage**:
-Gameflow screenshot flow first captures a small `640x360` gate frame during normal play and only upgrades to a full `1024x576` OCR frame after consecutive candidate frames; full OCR backs off for about four seconds after no-match frames.
-_Avoid_: treating gate frames as OCR frames
+**名次（Placement）**:
+一支队伍在一场斗魂对局中的最终位置，取值 1–8。
+_避免_: 排名、rating、分数、胜率
 
-**符文榜**:
-The Arena leaderboard tab that ranks augments for one selected champion.
-_Avoid_: calling it the global augment ranking
+**平均名次（Average Placement）**:
+样本对局中名次的算术平均，取值 1–8，越低越强。本项目表达斗魂强度的一等指标。
+_避免_: 排名、均名、平均排名、rating
 
-**英雄胜率榜**:
-The Arena leaderboard tab that ranks champions by their overall Arena win rate and pick rate.
-_Avoid_: using it for champion-specific augment stats
+**第一名率（First-Place Rate）**:
+样本对局中取得名次 1 的比例。本项目表达斗魂上限的二等指标。
+_避免_: 吃鸡率、登顶率、胜率
 
-**组合榜**:
-The Arena leaderboard tab that ranks three-player and two-player Arena combinations.
-_Avoid_: calling a combination a champion build
+**选取率（Pick Rate）**:
+某个强化符文或装备在适用样本中被选取的比例。
+_避免_: 使用率、pick、热度
 
-## Example Dialogue
+**推荐度（Recommendation Score）**:
+为了在三个候选中快速比较而计算的相对分数。它可以吸收有明确来源的第三方指标，但不是名次、第一名率或胜率。
+_避免_: 胜率、强度值、rating
 
-Developer: "The user disabled Champion Details visibility. Should champion monitoring stop?"
+**强化符文（Augment）**:
+斗魂中三选一获得的增益，分白银、黄金、棱彩三个位阶。
+_避免_: 海克斯、符文、天赋、增幅
 
-Domain expert: "No. Keep monitoring and downstream features unchanged; only prevent the Champion Details window from being displayed."
+**棱彩装备（Prismatic Item）**:
+斗魂特有的高强度装备，由锻造器开出。它与强化符文的棱彩位阶不是同一概念。
+_避免_: 棱彩、棱镜装备、Prismatic augment
+
+**属性锻造器（Stat Anvil）**:
+斗魂中用来开出属性加成的道具，分棱彩、传说、属性三档。
+_避免_: 熔炉、锻炉、anvil
+
+**采购阶段（Shopping Phase）**:
+每个回合战斗前的阶段。玩家购买装备，并在出现候选时选取强化符文或棱彩装备。
+_避免_: 准备阶段、选卡阶段、buy phase
+
+**强化符文推荐弹窗（Augment Popup）**:
+采购阶段检测到三个强化符文候选后，显示在游戏窗口顶部的只读推荐层。
+_避免_: 海克斯弹窗、OCR 弹窗、悬浮窗、overlay
+
+**符文榜（Augment Leaderboard）**:
+针对一个已选英雄展示强化符文数据的榜单。
+_避免_: 全局强化符文榜、英雄胜率榜
+
+**英雄榜（Champion Leaderboard）**:
+按第三方斗魂统计展示英雄表现的榜单。字段必须带来源和口径，不把第三方 `win_rate` 当作本项目领域指标。
+_避免_: 英雄胜率榜、全局符文榜
+
+**组合榜（Combination Leaderboard）**:
+展示斗魂英雄组合数据的榜单。
+_避免_: 英雄出装、队伍榜

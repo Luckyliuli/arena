@@ -141,11 +141,6 @@ const router = createRouter({
       name: 'FloatingOverlay',
       component: () => import('./components/FloatingView.vue'),
     },
-    {
-      path: '/augment-side-panel',
-      name: 'AugmentSidePanel',
-      component: () => import('./components/AugmentSidePanelView.vue'),
-    },
   ],
 })
 
@@ -186,4 +181,3 @@ async function mountApp() {
 }
 
 void mountApp()
-
