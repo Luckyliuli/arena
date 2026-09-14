@@ -66,7 +66,7 @@ const preferenceDefinitions = [
   {
     key: 'championInsightAlwaysOnTop',
     storeKey: 'championInsight.alwaysOnTop',
-    defaultValue: false,
+    defaultValue: true,
     titleKey: 'preferences.alwaysOnTopTitle',
     descriptionKey: 'preferences.alwaysOnTopDescription',
   },

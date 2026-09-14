@@ -989,20 +989,19 @@ export function registerIpcHandlers(_isDev: boolean): void {
             const { findAugmentById } = await import('../../shared/augment-dictionary.ts')
             const records = bundle.records.map(r => {
                 const catalog = findAugmentById(r.augmentId)
-                if (!catalog) return null
                 return {
                     augmentId: r.augmentId,
-                    displayName: catalog.displayName,
-                    rarity: catalog.rarity,
-                    iconLarge: catalog.iconLarge,
-                    iconSmall: catalog.iconSmall,
+                    displayName: catalog?.displayName ?? r.displayName ?? { en: String(r.augmentId), zh: String(r.augmentId) },
+                    rarity: catalog?.rarity ?? r.rarity ?? 'unknown',
+                    iconLarge: catalog?.iconLarge ?? r.iconUrl ?? null,
+                    iconSmall: catalog?.iconSmall ?? r.iconUrl ?? null,
                     averagePlacement: r.averagePlacement,
                     firstPlaceRate: r.firstPlaceRate,
                     pickRate: r.pickRate,
                     winRate: r.winRate,
                     sampleSize: r.sampleSize,
                 }
-            }).filter(r => r !== null)
+            })
 
             const ranked = {
                 placement: rankAugmentStats(records as never, 'placement').slice(0, limit),

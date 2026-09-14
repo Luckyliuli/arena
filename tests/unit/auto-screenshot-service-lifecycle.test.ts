@@ -314,6 +314,11 @@ describe.sequential('automatic screenshot service lifecycle', () => {
     const service = createRunningIdleService()
     const fixture = readFileSync(fileURLToPath(new URL('../fixtures/opgg/arena-kalista-items.html', import.meta.url)), 'utf8')
     service.arenaItemSource = opggItemSource({ fetcher: async () => fixture, defaultChampionSlug: 'Kalista' })
+    service.arenaItemDictionary = [
+      { itemId: 443090, name: '收割者的过路费', iconUrl: null },
+      { itemId: 443069, name: '断筋者', iconUrl: null },
+      { itemId: 443054, name: '暗钢利爪', iconUrl: null },
+    ]
     appStore.get.mockReturnValue(429)
     const send = vi.fn()
     const floatingWindow = {
@@ -348,5 +353,40 @@ describe.sequential('automatic screenshot service lifecycle', () => {
         expect.objectContaining({ itemId: 443054, detectedSlot: 2 }),
       ]),
     }))
+  })
+
+  it('recovers OP.GG-only augments that are absent from the CDragon dictionary', async () => {
+    const service = createRunningIdleService()
+    service.arenaAugmentSource = {
+      id: 'opgg',
+      label: 'test',
+      getStatsForChampion: async () => ({
+        source: 'opgg',
+        mock: false,
+        fetchedAt: new Date().toISOString(),
+        records: [
+          { augmentId: 1328, displayName: { en: 'Critical Rhythm', zh: '暴击律动' }, rarity: 'gold', iconUrl: 'https://example.com/1328.png', averagePlacement: null, firstPlaceRate: null, pickRate: 0.12, winRate: 0.48, sampleSize: 1000 },
+          { augmentId: 38, displayName: { en: 'From Beginning to End', zh: '有始有终' }, rarity: 'gold', iconUrl: null, averagePlacement: null, firstPlaceRate: null, pickRate: 0.1, winRate: 0.5, sampleSize: 500 },
+          { augmentId: 68, displayName: { en: 'Recursion', zh: '循环往复' }, rarity: 'gold', iconUrl: null, averagePlacement: null, firstPlaceRate: null, pickRate: 0.1, winRate: 0.5, sampleSize: 500 },
+        ],
+      }),
+    }
+    appStore.get.mockReturnValue(429)
+
+    const payload = await service._tryArenaAugmentFallback({
+      timestamp: Date.now(),
+      analysis: {
+        cardCount: 2,
+        augments: [{ id: 38, detectedSlot: 1 }, { id: 68, detectedSlot: 2 }],
+        slotDiagnostics: [
+          { slot: 0, text: '暴击律动 街客' },
+          { slot: 1, text: '有始有终 伤古' },
+          { slot: 2, text: '循环往复 诗项' },
+        ],
+      },
+    })
+
+    expect(payload?.analysis.augments.map(augment => augment.id)).toEqual([1328, 38, 68])
+    expect(payload?.analysis.augments[0]).toMatchObject({ name: '暴击律动', iconPath: 'https://example.com/1328.png' })
   })
 })

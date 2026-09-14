@@ -43,7 +43,16 @@
         <tr v-for="(row, idx) in rows" :key="row.augmentId">
           <td class="rank-col">{{ idx + 1 }}</td>
           <td class="name-col">
-            <span class="augment-name">{{ row.displayName.zh || row.displayName.en }}</span>
+            <div class="augment-name-cell">
+              <img
+                v-if="row.iconLarge || row.iconSmall"
+                :src="getAugmentIconUrl(row.iconLarge || row.iconSmall)"
+                :alt="row.displayName.zh || row.displayName.en"
+                class="leaderboard-augment-icon"
+                loading="lazy"
+              />
+              <span class="augment-name">{{ row.displayName.zh || row.displayName.en }}</span>
+            </div>
           </td>
           <td class="rarity-col">
             <span class="rarity-badge" :class="rarityClass(row.rarity)">{{ rarityLabel(row.rarity) }}</span>
@@ -63,6 +72,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { AlertTriangle, BarChart3, RefreshCw } from 'lucide-vue-next'
 import { electronAPI, hasElectronAPI } from '../native/electron-api.ts'
+import { getAugmentIconUrl } from '../service/cdn'
 import { useI18n } from 'vue-i18n'
 import type {
   ArenaAugmentLeaderboardRow,
@@ -289,7 +299,9 @@ onMounted(() => { void reload(); });
 .leaderboard-table .metric-col { text-align: right; font-variant-numeric: tabular-nums; }
 .leaderboard-table .sample-col { text-align: right; color: var(--hex-fg-muted, #9aa0aa); font-variant-numeric: tabular-nums; }
 
-.augment-name { display: block; }
+.augment-name-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.leaderboard-augment-icon { width: 26px; height: 26px; flex: 0 0 auto; border-radius: 4px; object-fit: cover; }
+.augment-name { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .rarity-badge {
     display: inline-block;

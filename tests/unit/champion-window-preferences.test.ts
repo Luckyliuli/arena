@@ -63,11 +63,11 @@ async function setup() {
 }
 
 describe('champion window preferences', () => {
-  it('creates an unpinned window by default and applies saved pinning on each show', async () => {
+  it('creates a pinned window by default and applies saved pinning on each show', async () => {
     const { popup } = await setup()
-    expect((popup as any).options.alwaysOnTop).toBe(false)
+    expect((popup as any).options.alwaysOnTop).toBe(true)
     popup.show()
-    expect(popup.setAlwaysOnTop).toHaveBeenLastCalledWith(false, expect.any(String))
+    expect(popup.setAlwaysOnTop).toHaveBeenLastCalledWith(true, expect.any(String))
     mocks.store.set('championInsight.alwaysOnTop', true)
     popup.hide()
     popup.show()
@@ -116,7 +116,7 @@ describe('champion window preferences', () => {
     expect(popup.setAlwaysOnTop).toHaveBeenLastCalledWith(false, expect.any(String))
     set({}, 'championInsight.alwaysOnTop', true)
     mocks.handlers.get('store-delete')!({}, 'championInsight.alwaysOnTop')
-    expect(popup.setAlwaysOnTop).toHaveBeenLastCalledWith(false, expect.any(String))
+    expect(popup.setAlwaysOnTop).toHaveBeenLastCalledWith(true, expect.any(String))
     set({}, 'championInsight.alwaysOnTop', true)
     set({}, 'championInsight.hideOnGameStart', true)
     expect(popup.isVisible()).toBe(false)

@@ -61,7 +61,7 @@ export function getAugmentIconUrl(iconPath) {
   }
 
   // Community Dragon CDN base URL
-  const baseUrl = 'https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default';
+  const baseUrl = 'https://raw.communitydragon.org/latest/game';
 
   // Clean up and normalize the path
   const cleanPath = iconPath.toLowerCase().replace(/\\/g, '/');

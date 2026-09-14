@@ -194,13 +194,13 @@ describe('opggSource empty-result reasons', () => {
     expect(bundle.reason).toBe('page-shape-changed')
   })
 
-  it('reports no-records-after-join when records parse but none match the catalog', async () => {
+  it('keeps parsed records when they are absent from the catalog', async () => {
     // Same shape as the real payload, but every id is bogus.
     const html = await buildSingleRecordPage()
     const src = opggSource({ fetcher: async () => html, cache: memoryOpggCache() })
     const bundle = await src.getStatsForChampion(1)
-    expect(bundle.records).toEqual([])
-    expect(bundle.reason).toBe('no-records-after-join')
+    expect(bundle.records).toEqual([expect.objectContaining({ augmentId: 888888, displayName: { en: '幽灵符文', zh: '幽灵符文' } })])
+    expect(bundle.reason).toBeUndefined()
   })
 
   it('omits reason entirely on a successful fetch', async () => {

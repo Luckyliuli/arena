@@ -229,10 +229,12 @@ class AutoScreenshotService {
         this.lastDetectedAugmentAt = 0
         this.visibleAugmentMissCount = 0
         this.arenaItemSource = null
+        this.arenaItemDictionary = null
         this.lastDetectedArenaItemIds = []
         this.lastDetectedArenaItemAt = 0
         this.arenaItemMissCount = 0
         this.lastArenaItemMatchAttemptAt = 0
+        this.lastArenaAugmentFallbackAttemptAt = 0
         this.startedAt = 0
         this.firstCaptureLogged = false
         this.firstDetectionLogged = false
@@ -755,6 +757,12 @@ class AutoScreenshotService {
                 return  // 分析失败，不继续处理
             }
 
+            const fallbackAugmentPayload = await this._tryArenaAugmentFallback(analysisResult)
+            if (fallbackAugmentPayload) {
+                await this._notifyAugmentDetected(fallbackAugmentPayload)
+                return
+            }
+
             if (analysisResult.analysis.cardCount === 0 || (analysisResult.analysis.augments?.length ?? 0) === 0) {
                 const handledArenaItemSelection = await this._tryArenaItemSelection(analysisResult)
                 if (handledArenaItemSelection) return
@@ -1213,15 +1221,8 @@ class AutoScreenshotService {
 
         const startedAt = Date.now()
         try {
-            const {
-                fileOpggCache,
-                recommendArenaAugmentCandidates,
-                selectAugmentSource,
-            } = await import('./services/arena-augment-data/index.ts')
-            const { getArenaAugmentCacheDir } = await import('./modules/app-paths.ts')
-            const source = selectAugmentSource({
-                opgg: { cache: fileOpggCache(getArenaAugmentCacheDir()) },
-            })
+            const { recommendArenaAugmentCandidates } = await import('./services/arena-augment-data/index.ts')
+            const source = await this._getArenaAugmentSource()
             const bundle = await source.getStatsForChampion(championId)
             const recommendations = recommendArenaAugmentCandidates(candidates, bundle)
             if (recommendations.suppressAugmentPopup) {
@@ -1381,6 +1382,19 @@ class AutoScreenshotService {
         }
     }
 
+    async _getArenaItemDictionary() {
+        if (!this.arenaItemDictionary) {
+            const { loadItems } = await import('./data-loader.ts')
+            const items = await loadItems()
+            this.arenaItemDictionary = items.map(item => ({
+                itemId: Number(item.id),
+                name: typeof item.name === 'string' ? item.name : (item.name?.zh_CN || item.name?.en_us || ''),
+                iconUrl: item.iconUrl || item.iconPath || null,
+            })).filter(item => Number.isInteger(item.itemId) && item.itemId > 0 && item.name)
+        }
+        return this.arenaItemDictionary
+    }
+
     async _getArenaItemSource() {
         if (!this.arenaItemSource) {
             const { fileOpggItemCache, opggItemSource } = await import('./services/arena-augment-data/index.ts')
@@ -1388,6 +1402,80 @@ class AutoScreenshotService {
             this.arenaItemSource = opggItemSource({ cache: fileOpggItemCache(getArenaAugmentCacheDir()) })
         }
         return this.arenaItemSource
+    }
+
+    async _getArenaAugmentSource() {
+        if (!this.arenaAugmentSource) {
+            const { fileOpggCache, selectAugmentSource } = await import('./services/arena-augment-data/index.ts')
+            const { getArenaAugmentCacheDir } = await import('./modules/app-paths.ts')
+            this.arenaAugmentSource = selectAugmentSource({ opgg: { cache: fileOpggCache(getArenaAugmentCacheDir()) } })
+        }
+        return this.arenaAugmentSource
+    }
+
+    async _tryArenaAugmentFallback(analysisResult) {
+        const existingAugments = Array.isArray(analysisResult.analysis.augments) ? analysisResult.analysis.augments : []
+        if (existingAugments.length >= 3) return null
+
+        const now = Date.now()
+        if (now - this.lastArenaAugmentFallbackAttemptAt < 1000) return null
+        this.lastArenaAugmentFallbackAttemptAt = now
+
+        const championId = Number(store.get('lastSelectedChampionId'))
+        if (!Number.isInteger(championId) || championId <= 0) return null
+
+        const diagnostics = analysisResult.analysis.slotDiagnostics || []
+        const slotTexts = [0, 1, 2].map(slot => String(diagnostics.find(entry => Number(entry?.slot) === slot)?.text || '').trim())
+        if (slotTexts.filter(Boolean).length === 0) return null
+
+        try {
+            const { matchAugmentTitleRecords } = await import('./augment-title-matcher.ts')
+            const source = await this._getArenaAugmentSource()
+            const bundle = await source.getStatsForChampion(championId)
+            const records = bundle.records.map(record => ({
+                id: record.augmentId,
+                name: record.displayName?.zh || record.displayName?.en || String(record.augmentId),
+                rarity: record.rarity || 'unknown',
+                iconPath: record.iconUrl || null,
+            }))
+
+            const merged = [0, 1, 2].map(slot => {
+                const existing = existingAugments.find(augment => Number(augment?.detectedSlot) === slot)
+                if (existing) return existing
+                const match = matchAugmentTitleRecords(slotTexts[slot], records)[0]
+                if (!match) return { missing: true, detectedSlot: slot }
+                return {
+                    id: match.id,
+                    augmentId: match.id,
+                    name: match.name,
+                    rarity: match.rarity,
+                    iconPath: match.iconPath,
+                    confidence: 0.8,
+                    detectedSlot: slot,
+                    missing: false,
+                }
+            })
+
+            if (merged.filter(augment => !augment.missing).length < 3) return null
+            logger.info('[arena-augment] recovered OP.GG-only candidates', {
+                championId,
+                augmentIds: merged.map(augment => augment.id),
+                slotTexts: slotTexts.map(text => text.slice(0, 80)),
+            })
+            return {
+                ...analysisResult,
+                analysis: {
+                    ...analysisResult.analysis,
+                    augments: merged,
+                    cardCount: 3,
+                    confidence: 0.95,
+                    partialUpdate: false,
+                },
+            }
+        } catch (error) {
+            logger.warn('[arena-augment] OP.GG-only fallback failed', { championId, error: error.message })
+            return null
+        }
     }
 
     async _tryArenaItemSelection(analysisResult) {
@@ -1408,13 +1496,16 @@ class AutoScreenshotService {
         }
 
         try {
-            const { matchArenaItemSlotTexts, recommendArenaItemCandidates } = await import('./services/arena-augment-data/index.ts')
+            const { matchArenaItemNames, recommendArenaItemCandidates } = await import('./services/arena-augment-data/index.ts')
             const source = await this._getArenaItemSource()
-            const bundle = await source.getItemsForChampion(championId)
+            const [bundle, itemDictionary] = await Promise.all([
+                source.getItemsForChampion(championId),
+                this._getArenaItemDictionary(),
+            ])
             if (bundle.reason) {
                 logger.warn('[arena-item] source returned no records', { championId, reason: bundle.reason })
             }
-            const candidates = matchArenaItemSlotTexts(slotTexts, bundle.categories.prismatic)
+            const candidates = matchArenaItemNames(slotTexts, itemDictionary)
             if (candidates.length < 3) {
                 logger.debug('[arena-item] OCR did not resolve three prismatic items', {
                     championId,
@@ -1425,7 +1516,7 @@ class AutoScreenshotService {
                 return false
             }
 
-            const items = recommendArenaItemCandidates(candidates, bundle.categories.prismatic)
+            const items = recommendArenaItemCandidates(candidates, Object.values(bundle.categories).flat())
             const currentIds = items.map(item => item.itemId).filter(Boolean)
             const changed = currentIds.join(',') !== this.lastDetectedArenaItemIds.join(',')
             this.arenaItemMissCount = 0
@@ -1940,6 +2031,7 @@ class AutoScreenshotService {
         this.lastDetectedArenaItemAt = 0
         this.arenaItemMissCount = 0
         this.lastArenaItemMatchAttemptAt = 0
+        this.lastArenaAugmentFallbackAttemptAt = 0
         this.startedAt = 0
         this.firstCaptureLogged = false
         this.firstDetectionLogged = false

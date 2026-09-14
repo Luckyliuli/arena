@@ -96,9 +96,11 @@ function emptyBundle(reason: string): AugmentStatsBundle {
 
 function toPerfStat(r: OpggAugmentRecord, dict: readonly ArenaAugmentRecord[]): AugmentPerfStat | null {
   const match = dict.find((d) => d.id === r.id) ?? dict.find((d) => d.displayName.zh === r.name || d.displayName.en === r.name)
-  if (!match) return null
   return {
-    augmentId: match.id,
+    augmentId: match?.id ?? r.id,
+    displayName: match?.displayName ?? { en: r.name, zh: r.name },
+    rarity: match?.rarity ?? r.rarity,
+    iconUrl: r.imageUrl,
     averagePlacement: null,
     firstPlaceRate: null,
     pickRate: r.pickRate,

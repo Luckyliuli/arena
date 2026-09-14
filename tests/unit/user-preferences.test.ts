@@ -38,8 +38,8 @@ describe('user preferences', () => {
     expect(shouldHideChampionInsightOnGameStart()).toBe(false)
   })
 
-  it('only enables always-on-top when the user has enabled it', () => {
-    expect(shouldKeepChampionInsightOnTop()).toBe(false)
+  it('enables always-on-top by default and still honors explicit changes', () => {
+    expect(shouldKeepChampionInsightOnTop()).toBe(true)
     expect(mocks.get).toHaveBeenCalledWith('championInsight.alwaysOnTop')
     mocks.get.mockReturnValue(true)
     expect(shouldKeepChampionInsightOnTop()).toBe(true)

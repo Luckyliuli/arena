@@ -26,7 +26,7 @@ export function shouldHideChampionInsightOnGameStart(): boolean {
 }
 
 export function shouldKeepChampionInsightOnTop(): boolean {
-    return getBooleanPreference(USER_PREFERENCE_KEYS.championInsightAlwaysOnTop, false)
+    return getBooleanPreference(USER_PREFERENCE_KEYS.championInsightAlwaysOnTop, true)
 }
 
 export function shouldShowAugmentTopOverlay(): boolean {

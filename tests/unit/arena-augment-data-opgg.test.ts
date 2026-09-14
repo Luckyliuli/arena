@@ -87,8 +87,9 @@ describe('opggSource (offline fixture, real payload shape)', () => {
     expect(src.id).toBe('opgg')
     expect(bundle.source).toBe('opgg')
     expect(bundle.mock).toBe(false)
-    // The 999999 row is absent from the CDR dictionary and must be dropped.
-    expect(bundle.records.map(r => r.augmentId).sort((a, b) => a - b)).toEqual([48, 65, 97, 205])
+    // OP.GG-only rows stay in the bundle and carry fallback metadata.
+    expect(bundle.records.map(r => r.augmentId).sort((a, b) => a - b)).toEqual([48, 65, 97, 205, 999999])
+    expect(bundle.records.find(r => r.augmentId === 999999)).toMatchObject({ displayName: { en: '不存在的符文', zh: '不存在的符文' }, rarity: 'gold' })
   })
 
   it('maps OP.GG fields to AugmentPerfStat without inventing placement data', async () => {

@@ -19,6 +19,9 @@ export type RarityTier = ArenaAugmentRecord['rarity']
 
 export type AugmentPerfStat = {
   augmentId: number
+  displayName?: { en: string; zh: string }
+  rarity?: RarityTier
+  iconUrl?: string | null
   averagePlacement: number | null  // 1..8, lower is better
   firstPlaceRate: number | null    // 0..1
   pickRate: number | null          // 0..1

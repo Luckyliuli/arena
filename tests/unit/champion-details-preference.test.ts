@@ -32,7 +32,7 @@ describe('Champion Details visibility preference', () => {
 
     expect(set).toHaveBeenCalledWith('championInsight.showDetails', true)
     expect(set).toHaveBeenCalledWith('championInsight.hideOnGameStart', true)
-    expect(set).toHaveBeenCalledWith('championInsight.alwaysOnTop', false)
+    expect(set).toHaveBeenCalledWith('championInsight.alwaysOnTop', true)
     const championDetailsSwitch = wrapper.findAll('[role="switch"]')[0]
     expect(championDetailsSwitch.attributes('aria-checked')).toBe('true')
 
