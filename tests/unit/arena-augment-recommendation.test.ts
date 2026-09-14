@@ -18,9 +18,14 @@ const bundle = (
   ...overrides,
 })
 
-const candidate = (augmentId: number | null, detectedSlot: number): ArenaRecommendationCandidate => ({
+const candidate = (
+  augmentId: number | null,
+  detectedSlot: number,
+  rarity: 'silver' | 'gold' | 'prismatic' | 'unknown' = 'gold',
+): ArenaRecommendationCandidate => ({
   augmentId,
   detectedSlot,
+  rarity,
 })
 
 describe('arena augment recommendation score', () => {
@@ -168,5 +173,50 @@ describe('recommendArenaAugmentCandidates', () => {
     })
     expect(result.mock).toBe(true)
     expect(result.reason).toBe('fixture')
+  })
+})
+describe('Arena augment availability and special offers', () => {
+  it('marks a recognised augment absent from the champion list as not recommended without scoring it', () => {
+    const result = recommendArenaAugmentCandidates(
+      [candidate(310, 0, 'prismatic'), candidate(101, 1), candidate(202, 2)],
+      bundle([
+        { augmentId: 101, averagePlacement: null, firstPlaceRate: null, pickRate: 0.2, winRate: 0.5, sampleSize: 500 },
+        { augmentId: 202, averagePlacement: null, firstPlaceRate: null, pickRate: 0.1, winRate: 0.4, sampleSize: 500 },
+      ]),
+    )
+
+    expect(result.candidates[0]).toMatchObject({
+      augmentId: 310,
+      notRecommendedForChampion: true,
+      recommendScore: null,
+      isTopPick: false,
+    })
+    expect(result.topPick?.augmentId).toBe(101)
+  })
+
+  it('suppresses the popup when all candidates are special options', () => {
+    const result = recommendArenaAugmentCandidates(
+      [candidate(365, 0, 'unknown'), candidate(368, 1, 'unknown'), candidate(371, 2, 'unknown')],
+      bundle([]),
+    )
+
+    expect(result.suppressAugmentPopup).toBe(true)
+    expect(result.suppressionReason).toBe('special-options')
+    expect(result.candidates.every(item => item.isSpecialOption)).toBe(true)
+    expect(result.topPick).toBeNull()
+  })
+
+  it('does not suppress a mixed group and never scores the special candidate', () => {
+    const result = recommendArenaAugmentCandidates(
+      [candidate(365, 0, 'unknown'), candidate(101, 1), candidate(202, 2)],
+      bundle([
+        { augmentId: 101, averagePlacement: null, firstPlaceRate: null, pickRate: 0.2, winRate: 0.5, sampleSize: 500 },
+        { augmentId: 202, averagePlacement: null, firstPlaceRate: null, pickRate: 0.1, winRate: 0.4, sampleSize: 500 },
+      ]),
+    )
+
+    expect(result.suppressAugmentPopup).toBe(false)
+    expect(result.candidates[0]).toMatchObject({ isSpecialOption: true, recommendScore: null })
+    expect(result.topPick?.augmentId).toBe(101)
   })
 })

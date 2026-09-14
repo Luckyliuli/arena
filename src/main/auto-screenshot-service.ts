@@ -1048,7 +1048,7 @@ class AutoScreenshotService {
                 slot: Number.isInteger(augment?.detectedSlot) ? augment.detectedSlot : index,
                 id: augment?.id ?? null,
                 name: augment?.name || '',
-                rarity: augment?.rarity || 'unknown',
+                rarity: augment?.rarity || null,
             })),
             slotFingerprints,
             slotDiagnostics: summarizeSlotDiagnostics(analysisResult.analysis.slotDiagnostics || []),
@@ -1192,6 +1192,7 @@ class AutoScreenshotService {
             return {
                 augmentId: Number.isInteger(rawId) && rawId > 0 ? rawId : null,
                 detectedSlot: Number.isInteger(augment?.detectedSlot) ? augment.detectedSlot : index,
+                rarity: augment?.rarity || null,
             }
         })
 
@@ -1212,6 +1213,16 @@ class AutoScreenshotService {
             })
             const bundle = await source.getStatsForChampion(championId)
             const recommendations = recommendArenaAugmentCandidates(candidates, bundle)
+            if (recommendations.suppressAugmentPopup) {
+                logger.info('Augment recommendation suppressed: special options only', {
+                    championId,
+                    augmentIds: candidates.map(candidate => candidate.augmentId).filter(Boolean),
+                    reason: recommendations.suppressionReason,
+                })
+                this._notifyAugmentCleared('special-options')
+                return null
+            }
+
             const recommendationBySlot = new Map(
                 recommendations.candidates.map(item => [item.detectedSlot, item])
             )
@@ -1234,6 +1245,8 @@ class AutoScreenshotService {
                     recommendScore: recommendation.recommendScore,
                     recommendationTier: recommendation.recommendationTier,
                     isTopPick: recommendation.isTopPick,
+                    notRecommendedForChampion: recommendation.notRecommendedForChampion,
+                    isSpecialOption: recommendation.isSpecialOption,
                     dataAvailable: recommendation.recommendScore != null,
                     mock: recommendation.mock,
                     detectedSlot: augment.detectedSlot,
@@ -1398,6 +1411,18 @@ class AutoScreenshotService {
                 dataSource: 'auto-analysis',
                 winrateInMain: false,
                 winratePending: false,
+            }
+
+            const allCandidatesSpecial = baseWinrateData.augments.length > 0 && baseWinrateData.augments.every(augment => (
+                Number(augment.id) > 0 && augment.rarity === 'unknown'
+            ))
+            if (allCandidatesSpecial) {
+                logger.info('Augment recommendation suppressed: special options only', {
+                    championId,
+                    augmentIds: getPayloadAugmentIds(baseWinrateData.augments),
+                })
+                this._notifyAugmentCleared('special-options')
+                return
             }
 
             const shouldEnrichWinrate = !!championId && getPayloadAugmentIds(baseWinrateData.augments).length > 0

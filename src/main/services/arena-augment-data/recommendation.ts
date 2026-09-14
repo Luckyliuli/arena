@@ -8,6 +8,8 @@ export type { ArenaRecommendationTier }
 export type ArenaRecommendationCandidate = {
   augmentId: number | null
   detectedSlot: number
+  /** Arena catalog rarity; `unknown` identifies special offers. */
+  rarity?: 'silver' | 'gold' | 'prismatic' | 'unknown'
 }
 
 export type ArenaAugmentRecommendation = {
@@ -27,6 +29,10 @@ export type ArenaAugmentRecommendation = {
   averagePlacement: number | null
   firstPlaceRate: number | null
   missing: boolean
+  /** Recognised standard augment that OP.GG does not recommend for this champion. */
+  notRecommendedForChampion: boolean
+  /** CommunityDragon special option (anvil/economy/crafting), not a normal augment. */
+  isSpecialOption: boolean
   mock: boolean
 }
 
@@ -42,6 +48,8 @@ export type ArenaAugmentRecommendationSet = {
   source: AugmentStatsBundle['source']
   fetchedAt: string
   reason: string | null
+  suppressAugmentPopup: boolean
+  suppressionReason: 'special-options' | null
 }
 
 function isProbability(value: number | null): value is number {
@@ -92,7 +100,9 @@ export function recommendArenaAugmentCandidates(
     const augmentId = Number.isInteger(candidate.augmentId) && Number(candidate.augmentId) > 0
       ? Number(candidate.augmentId)
       : null
-    const stat = augmentId == null ? null : statById.get(augmentId) ?? null
+    const isSpecialOption = augmentId != null && candidate.rarity === 'unknown'
+    const stat = augmentId == null || isSpecialOption ? null : statById.get(augmentId) ?? null
+    const notRecommendedForChampion = augmentId != null && !isSpecialOption && stat == null
     const recommendScore = calculateArenaRecommendScore(stat)
 
     return {
@@ -107,13 +117,15 @@ export function recommendArenaAugmentCandidates(
       averagePlacement: stat && isPlacement(stat.averagePlacement) ? stat.averagePlacement : null,
       firstPlaceRate: stat && isProbability(stat.firstPlaceRate) ? stat.firstPlaceRate : null,
       missing: augmentId == null,
+      notRecommendedForChampion,
+      isSpecialOption,
       mock: bundle.mock,
     } satisfies ArenaAugmentRecommendation
   })
 
   let topPick: ArenaAugmentRecommendationSet['topPick'] = null
   for (const item of normalized) {
-    if (item.augmentId == null || item.recommendScore == null) {
+    if (item.augmentId == null || item.isSpecialOption || item.notRecommendedForChampion || item.recommendScore == null) {
       continue
     }
     if (topPick == null || item.recommendScore > topPick.recommendScore) {
@@ -132,6 +144,8 @@ export function recommendArenaAugmentCandidates(
     if (top) top.isTopPick = true
   }
 
+  const allSpecialOptions = normalized.length > 0 && normalized.every(item => item.isSpecialOption)
+
   return {
     candidates: normalized,
     topPick,
@@ -140,5 +154,7 @@ export function recommendArenaAugmentCandidates(
     source: bundle.source,
     fetchedAt: bundle.fetchedAt,
     reason: bundle.reason ?? null,
+    suppressAugmentPopup: allSpecialOptions,
+    suppressionReason: allSpecialOptions ? 'special-options' : null,
   }
 }

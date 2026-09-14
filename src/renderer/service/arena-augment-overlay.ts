@@ -53,14 +53,14 @@ function createEmptyAugment(detectedSlot: number): ArenaOverlayAugment {
 export function getArenaOverlayRecommendationScore(
   augment: ArenaOverlayAugment | null | undefined,
 ): number | null {
-  if (!augment || isMissingAugment(augment)) return null
+  if (!augment || isMissingAugment(augment) || augment.notRecommendedForChampion === true) return null
   return toFiniteNumber(augment.recommendScore)
 }
 
 export function getArenaOverlayRecommendationTier(
   augment: ArenaOverlayAugment | null | undefined,
 ): ArenaOverlayRecommendationTier | null {
-  if (!augment || isMissingAugment(augment)) return null
+  if (!augment || isMissingAugment(augment) || augment.notRecommendedForChampion === true) return null
 
   const declaredTier = augment.recommendationTier
   if (typeof declaredTier === 'string' && RECOMMENDATION_TIERS.has(declaredTier as ArenaOverlayRecommendationTier)) {
@@ -110,7 +110,7 @@ export function findArenaOverlayTopPickIndex(
   augments: readonly ArenaOverlayAugment[] = [],
 ): number {
   const explicitTopPick = augments.findIndex(augment => (
-    !isMissingAugment(augment) && augment?.isTopPick === true
+    !isMissingAugment(augment) && augment?.notRecommendedForChampion !== true && augment?.isTopPick === true
   ))
   if (explicitTopPick >= 0) return explicitTopPick
 

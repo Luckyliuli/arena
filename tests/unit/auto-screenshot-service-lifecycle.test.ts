@@ -284,4 +284,24 @@ describe.sequential('automatic screenshot service lifecycle', () => {
     expect(send).not.toHaveBeenCalled()
     expect(mocks.logger.info).toHaveBeenCalledWith('Augment recommendation suppressed: champion unknown')
   })
+
+  it('suppresses an all-special augment offer without producing a popup payload', async () => {
+    process.env.ARENA_AUGMENT_SOURCE = 'mock'
+    try {
+      const service = createRunningIdleService()
+      const result = await service._loadAugmentWinratePayload({
+        championId: 1,
+        augments: [
+          { id: 365, name: '戒绝财富', rarity: 'unknown', detectedSlot: 0 },
+          { id: 368, name: '渴望财富', rarity: 'unknown', detectedSlot: 1 },
+          { id: 371, name: '强求财富', rarity: 'unknown', detectedSlot: 2 },
+        ],
+      })
+
+      expect(result).toBeNull()
+      expect(mocks.logger.info).toHaveBeenCalledWith('Augment recommendation suppressed: special options only', expect.any(Object))
+    } finally {
+      delete process.env.ARENA_AUGMENT_SOURCE
+    }
+  })
 })

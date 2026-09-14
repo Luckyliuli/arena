@@ -252,6 +252,10 @@ export interface ArenaOverlayAugmentPayload extends LooseRecord {
   pickRate?: number | null
   mock?: boolean
   dataAvailable?: boolean
+  /** Recognised standard augment absent from the champion's OP.GG recommendations. */
+  notRecommendedForChampion?: boolean
+  /** CommunityDragon special option, excluded from normal augment scoring. */
+  isSpecialOption?: boolean
 }
 
 export interface OverlayPayload extends LooseRecord {
@@ -265,6 +269,7 @@ export interface OverlayPayload extends LooseRecord {
   recommendationSource?: string
   topPickAugmentId?: number | null
   topPickDetectedSlot?: number | null
+  suppressionReason?: 'special-options' | null
 }
 
 export interface GamePhaseChangedPayload {

@@ -98,6 +98,7 @@ describe('arena overlay recommendation helpers', () => {
     expect(getArenaOverlayRecommendationScore({ recommendScore: 0.42 })).toBeCloseTo(0.42)
     expect(getArenaOverlayRecommendationScore({ recommendScore: null })).toBeNull()
     expect(getArenaOverlayRecommendationScore({ missing: true, recommendScore: 0.9 })).toBeNull()
+    expect(getArenaOverlayRecommendationScore({ notRecommendedForChampion: true, recommendScore: 0.9 })).toBeNull()
   })
 
   it('uses the declared tier and falls back to score bands', () => {
@@ -116,3 +117,12 @@ describe('arena overlay recommendation helpers', () => {
     expect(hasArenaOverlayMockData([augment({ mock: false })], false)).toBe(false)
   })
 })
+  it('never marks a champion-incompatible augment as priority', () => {
+    const ordered = orderArenaOverlayAugments([
+      augment({ augmentId: 310, detectedSlot: 0, recommendScore: null, notRecommendedForChampion: true }),
+      augment({ augmentId: 202, detectedSlot: 1, recommendScore: 0.4 }),
+    ])
+
+    expect(getArenaOverlayRecommendationTier(ordered[0])).toBeNull()
+    expect(findArenaOverlayTopPickIndex(ordered)).toBe(1)
+  })

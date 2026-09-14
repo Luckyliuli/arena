@@ -17,7 +17,7 @@
             v-for="(augment, index) in overlayAugments"
             :key="getSlotKey(augment, index)"
             class="augment-item"
-            :class="[`rarity-${augment.rarity || 'unknown'}`, { 'top-pick': isTopPickIndex(index), 'empty-slot': augment.missing }]"
+            :class="[`rarity-${augment.rarity || 'unknown'}`, { 'top-pick': isTopPickIndex(index), 'empty-slot': augment.missing, 'not-recommended': augment.notRecommendedForChampion }]"
           >
             <div v-if="isTopPickIndex(index)" class="top-pick-badge">
               <span>*</span>
@@ -37,17 +37,22 @@
             <div class="content">
               <h3 class="name">{{ augment.missing ? '' : augment.name }}</h3>
               <template v-if="!augment.missing">
-                <span class="recommend-label" :class="getBadgeClass(augment)">
-                  {{ getRecommendText(augment) }} · {{ formatScore(augment.recommendScore) }}
+                <span v-if="augment.notRecommendedForChampion" class="recommend-label unavailable">
+                  {{ t('augment.notRecommendedForChampion') }}
                 </span>
-                <div class="stat-line">
-                  <span>{{ t('augment.pickRateShort') }}</span>
-                  <strong>{{ formatPercent(augment.pickRate) }}</strong>
-                </div>
+                <template v-else>
+                  <span class="recommend-label" :class="getBadgeClass(augment)">
+                    {{ getRecommendText(augment) }} · {{ formatScore(augment.recommendScore) }}
+                  </span>
+                  <div class="stat-line">
+                    <span>{{ t('augment.pickRateShort') }}</span>
+                    <strong>{{ formatPercent(augment.pickRate) }}</strong>
+                  </div>
+                </template>
               </template>
             </div>
 
-            <div v-if="!augment.missing" class="score-track">
+            <div v-if="!augment.missing && !augment.notRecommendedForChampion" class="score-track">
               <div class="score-fill" :style="{ width: getScoreWidth(augment.recommendScore) }"></div>
             </div>
           </div>
@@ -121,11 +126,12 @@ const RECOMMEND_TEXT_KEYS = {
 }
 
 const getRecommendText = (augment) => {
+  if (augment?.notRecommendedForChampion) return t('augment.notRecommendedForChampion')
   const tier = getArenaOverlayRecommendationTier(augment)
   return tier ? t(RECOMMEND_TEXT_KEYS[tier]) : t('augment.scoreUnknown')
 }
 
-const getBadgeClass = (augment) => getArenaOverlayRecommendationTier(augment) || 'unknown'
+const getBadgeClass = (augment) => augment?.notRecommendedForChampion ? 'unavailable' : getArenaOverlayRecommendationTier(augment) || 'unknown'
 
 const logFloatingInfo = (message, details = {}) => {
   try {
@@ -378,6 +384,11 @@ onBeforeUnmount(() => {
   border-style: dashed;
 }
 
+.augment-item.not-recommended {
+  opacity: 0.78;
+  border-color: rgba(248, 113, 113, 0.28);
+}
+
 .augment-item.empty-slot .augment-icon-frame {
   border-color: rgba(244, 236, 220, 0.16);
   background: rgba(244, 236, 220, 0.03);
@@ -506,6 +517,12 @@ onBeforeUnmount(() => {
   border-color: rgba(226, 195, 132, 0.42);
   background: rgba(226, 195, 132, 0.12);
   color: #e2c384;
+}
+
+.recommend-label.unavailable {
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(248, 113, 113, 0.08);
+  color: #fca5a5;
 }
 
 .recommend-label.niche,
