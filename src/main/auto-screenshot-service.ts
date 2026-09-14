@@ -16,6 +16,7 @@ import {
     resolveCaptureModeAfterAnalysis,
     resolveFullOcrBackoffUntil,
     resolveGameflowCaptureInterval,
+    resolveGameflowNextCaptureDelay,
     shouldQueueFullCapture,
     shouldActivateSelectionCapture,
 } from './auto-screenshot-policy.ts'
@@ -383,6 +384,13 @@ class AutoScreenshotService {
         return !this.gameflowPhase || this.gameflowPhase === 'InProgress' || this.gameflowPhase === 'None'
     }
 
+    _isCurrentAnalysisRun(runId) {
+        return this.isRunning &&
+            runId === this.runId &&
+            this.enableAnalysis &&
+            this.isAnalysisAllowedByGameflow()
+    }
+
     clearAugmentState(reason = 'gameflow-cleared') {
         const previousIds = this.lastDetectedAugmentIds
         const ageMs = this.lastDetectedAugmentAt ? Date.now() - this.lastDetectedAugmentAt : null
@@ -430,7 +438,15 @@ class AutoScreenshotService {
 
             const elapsed = performance.now() - cycleStart
             const activeInterval = this._getCurrentCaptureInterval()
-            const nextDelay = Math.max(0, activeInterval - elapsed)
+            const nextDelay = this.controlOwner === 'gameflow'
+                ? resolveGameflowNextCaptureDelay({
+                    mode: this.captureMode,
+                    pendingFullCapture: this.pendingFullCapture,
+                    fullOcrCooldownUntil: this.fullOcrCooldownUntil,
+                    intervalMs: activeInterval,
+                    elapsedMs: elapsed,
+                })
+                : Math.max(0, activeInterval - elapsed)
             this._scheduleNextCapture(nextDelay, runId)
         }, delayMs)
     }

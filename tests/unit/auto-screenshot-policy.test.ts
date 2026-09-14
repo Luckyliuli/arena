@@ -10,6 +10,7 @@ import {
   resolveCaptureModeAfterAnalysis,
   resolveFullOcrBackoffUntil,
   resolveGameflowCaptureInterval,
+  resolveGameflowNextCaptureDelay,
   SELECTION_CANDIDATE_STREAK_THRESHOLD,
   shouldQueueFullCapture,
   shouldActivateSelectionCapture,
@@ -140,6 +141,22 @@ describe('automatic screenshot policy', () => {
       rerollVisible: true,
       currentStreak: 2,
     })).toBe(0)
+  })
+
+  it('runs the full capture immediately once a gate frame queues it', () => {
+    expect(resolveGameflowNextCaptureDelay({
+      mode: 'idle',
+      pendingFullCapture: true,
+      intervalMs: GAMEFLOW_IDLE_CAPTURE_INTERVAL_MS,
+      elapsedMs: 900,
+    })).toBe(0)
+
+    expect(resolveGameflowNextCaptureDelay({
+      mode: 'idle',
+      pendingFullCapture: false,
+      intervalMs: GAMEFLOW_IDLE_CAPTURE_INTERVAL_MS,
+      elapsedMs: 900,
+    })).toBe(600)
   })
 
   it('computes a future full OCR backoff timestamp', () => {

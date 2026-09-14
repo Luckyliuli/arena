@@ -27,10 +27,12 @@ describe('Arena item set builder', () => {
       type: 'custom',
       map: 'any',
       mode: 'any',
+      preferredItemSlots: [],
       sortrank: 0,
+      sortRank: 0,
       startedFrom: 'blank',
       associatedChampions: [429],
-      associatedMaps: [],
+      associatedMaps: [30],
       blocks: [
         { type: '棱彩装备', items: [{ id: 443054, count: 1 }, { id: 447114, count: 1 }] },
         { type: '核心装备', items: [{ id: 223153, count: 1 }, { id: 223124, count: 1 }, { id: 223302, count: 1 }] },

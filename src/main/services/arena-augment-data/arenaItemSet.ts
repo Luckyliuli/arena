@@ -6,12 +6,16 @@ export type ArenaItemSet = {
   type: 'custom'
   map: 'any'
   mode: 'any'
+  preferredItemSlots: []
   sortrank: number
+  sortRank: number
   startedFrom: 'blank'
   associatedChampions: number[]
-  associatedMaps: []
+  associatedMaps: number[]
   blocks: Array<{ type: string; items: Array<{ id: number; count: 1 }> }>
 }
+
+export const ARENA_MAP_ID = 30
 
 const CATEGORY_ORDER: ArenaItemCategory[] = ['prismatic', 'core', 'boots', 'starting', 'final']
 const CATEGORY_LABELS: Record<ArenaItemCategory, string> = {
@@ -48,10 +52,12 @@ export function buildArenaItemSet(options: {
     type: 'custom',
     map: 'any',
     mode: 'any',
+    preferredItemSlots: [],
     sortrank: 0,
+    sortRank: 0,
     startedFrom: 'blank',
     associatedChampions: [options.championId],
-    associatedMaps: [],
+    associatedMaps: [ARENA_MAP_ID],
     blocks,
   }
 }

@@ -1014,7 +1014,7 @@ export class LCUService {
 
       return (
         setUid.startsWith('aramgg-') ||
-        setTitle.startsWith('ARAMGG ARAM ') ||
+        setTitle.startsWith('ARAMGG ') ||
         blocks.some((block: any) => String(block?.type || '').startsWith('ARAMGG '))
       )
     }
