@@ -4,7 +4,7 @@
     <div v-else-if="error" class="state-line error">{{ error }}</div>
     <div class="meta-line">
       <span>{{ t('arenaLeaderboard.source') }}: {{ sourceLabel || '--' }}</span>
-      <span>{{ rows.length }} {{ t('arenaLeaderboard.columns.games') }}</span>
+      <span>{{ rows.length }}</span>
     </div>
 
     <table class="leaderboard-table augment-table">
