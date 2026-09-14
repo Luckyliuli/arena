@@ -1384,13 +1384,12 @@ class AutoScreenshotService {
 
     async _getArenaItemDictionary() {
         if (!this.arenaItemDictionary) {
-            const { loadItems } = await import('./data-loader.ts')
-            const items = await loadItems()
-            this.arenaItemDictionary = items.map(item => ({
-                itemId: Number(item.id),
-                name: typeof item.name === 'string' ? item.name : (item.name?.zh_CN || item.name?.en_us || ''),
-                iconUrl: item.iconUrl || item.iconPath || null,
-            })).filter(item => Number.isInteger(item.itemId) && item.itemId > 0 && item.name)
+            const { loadArenaItemDictionary } = await import('../shared/item-dictionary.ts')
+            this.arenaItemDictionary = loadArenaItemDictionary().map(item => ({
+                itemId: item.id,
+                name: item.displayName.zh || item.displayName.en,
+                iconUrl: item.iconUrl,
+            }))
         }
         return this.arenaItemDictionary
     }

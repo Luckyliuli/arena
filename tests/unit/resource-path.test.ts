@@ -81,4 +81,10 @@ describe('resource path resolution', () => {
     const found = findResourceFile(path.join('resources', 'champions-arena.json'))
     expect(found).not.toBeNull()
   })
+
+  it('resolves the Arena item dictionary the same way', () => {
+    const found = findResourceFile(path.join('resources', 'items-arena.json'))
+    expect(found).not.toBeNull()
+    expect(fs.existsSync(found as string)).toBe(true)
+  })
 })

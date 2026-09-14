@@ -14,6 +14,8 @@
     "fetch:arena-augments:check": "node scripts/fetch-arena-augments.mjs --check",
     "fetch:arena-champions": "node scripts/fetch-arena-champions.mjs",
     "fetch:arena-champions:check": "node scripts/fetch-arena-champions.mjs --check",
+    "fetch:arena-items": "node scripts/fetch-arena-items.mjs",
+    "fetch:arena-items:check": "node scripts/fetch-arena-items.mjs --check",
     "pack": "node scripts/pack-electron.mjs",
     "lint": "eslint src --ext .js,.ts,.vue",
     "type-check": "vue-tsc -p tsconfig.renderer.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
@@ -83,6 +85,10 @@
       {
         "from": "resources/champions-arena.json",
         "to": "champions-arena.json"
+      },
+      {
+        "from": "resources/items-arena.json",
+        "to": "items-arena.json"
       }
     ],
     "win": {
