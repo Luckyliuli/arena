@@ -1,8 +1,10 @@
+> **状态：历史快照（2026-09-05）。** 本文只代表当时的审查、诊断或建议，不应作为当前 backlog 或当前行为说明；其中的源码路径和行号对应记录当时版本，可能已随仓库移动而失效。当前入口见 [docs/README.md](../../README.md)，当前开放事项见 [docs/STATUS.md](../../STATUS.md)，架构事实见 [COMPLETE_ARCHITECTURE.md](../../../COMPLETE_ARCHITECTURE.md)。
+
 # ARAMGG 客户端仓库审查 · 2026-09-05
 
 审查基线：`master` / `origin/master`，版本 `0.2.15`，提交 `431a93d91301dcfdd90bba0685aa8cff4fe84ba6`。已执行 `git pull --ff-only origin master`，结果为 Already up to date；结束时再次通过 `git ls-remote` 核对，远端仍为同一提交，ahead/behind 为 `0/0`。工作区起始干净。
 
-同日后续：A2 和 B3 已进行本地修复。四个窗口均为必要功能，按用户对首次显示速度的要求保留启动预加载；B2 的窗口数量属于资源与延迟取舍，不能单凭数量判为缺陷。见 [启动窗口与英雄监控优化](/Users/a111/Workspace/projects/aramgg_client/docs/CLIENT_MONITOR_OPTIMIZATION_2026-09-05.md)。以下检查与问题证据为修复前基线，不能视为当前工作区所有条目仍未处理。
+同日后续：A2 和 B3 已进行本地修复。四个窗口均为必要功能，按用户对首次显示速度的要求保留启动预加载；B2 的窗口数量属于资源与延迟取舍，不能单凭数量判为缺陷。见 [启动窗口与英雄监控优化](./client-monitor-optimization.md)。以下检查与问题证据为修复前基线，不能视为当前工作区所有条目仍未处理。
 
 建议先处理两个已复现的异步生命周期缺陷，以及截图留存、更新签名的边界，再优化英文 OCR 匹配、重复轮询和窗口启动。界面已有统一的深色与金色视觉风格，主要问题集中在信息密度、窄窗口遮挡、多语言刷新和键盘交互，无须整体重做视觉体系。
 
@@ -24,7 +26,7 @@
 
 环境为 macOS、Node `24.16.0`、npm `11.13.0`，与发布 CI 的 Node `22.18.0` / npm 10 不同。没有执行 Windows 安装包、实际 League 对局或真实 GPU/温度采样；浏览器预览没有连接用户的 LCU、配置、日志或战绩。不能用本次结果宣称已定位当前 Windows 发热根因，也不能替代安装包验收。
 
-原始输出、截图和行为探针快照保存在 [审查证据目录](/Users/a111/Workspace/projects/aramgg_client/docs/audits/2026-09-05/evidence.json)。探针源代码以 `.txt` 留存，包含本次机器路径，仅作为可复核快照，不进入项目测试发现范围。临时浏览器与服务已关闭。
+原始输出、截图和行为探针快照保存在 [审查证据目录](./evidence.json)。探针源代码以 `.txt` 留存，包含本次机器路径，仅作为可复核快照，不进入项目测试发现范围。临时浏览器与服务已关闭。
 
 ## 优先级清单
 
@@ -52,7 +54,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 ### A1 · OCR 停止后的旧结果仍可生效
 
-位置：[分析队列](/Users/a111/Workspace/projects/aramgg_client/src/main/auto-screenshot-service.ts:691)、[分析结果处理](/Users/a111/Workspace/projects/aramgg_client/src/main/auto-screenshot-service.ts:728)、[窗口通知](/Users/a111/Workspace/projects/aramgg_client/src/main/auto-screenshot-service.ts:1239)。
+位置：[分析队列](../../../../../src/main/auto-screenshot-service.ts:691)、[分析结果处理](../../../../../src/main/auto-screenshot-service.ts:728)、[窗口通知](../../../../../src/main/auto-screenshot-service.ts:1239)。
 
 队列在 `await this._analyzeScreenshot(...)` **之后**才验证 runId；但被等待的函数内部已经改写检测状态并调用通知。此时外层发现旧任务也无法撤销这些副作用。通知发送路径也没有对局阶段/runId 的统一校验。
 
@@ -62,7 +64,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 ### A2 · “已停止”监控仍会恢复轮询
 
-位置：[ChampionMonitor 启动和停止](/Users/a111/Workspace/projects/aramgg_client/src/renderer/components/ChampionMonitor.vue:85)。
+位置：[ChampionMonitor 启动和停止](../../../../../src/renderer/components/ChampionMonitor.vue:85)。
 
 启动先将 `isMonitoring` 设为 true，等待首次 IPC，然后无条件 `setInterval`。如果用户在等待期间停止，停止逻辑当时没有定时器可清；请求完成后反而创建新定时器。卸载再次调用停止时，因为状态已经 false，提前返回也不能清理它。
 
@@ -72,7 +74,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 ### A3 · OCR 调试材料留存范围过大
 
-位置：[部分识别截图保存](/Users/a111/Workspace/projects/aramgg_client/src/main/auto-screenshot-service.ts:1077)、[慢 OCR 日志](/Users/a111/Workspace/projects/aramgg_client/src/main/image-analyzer.ts:1496)、[反馈日志脱敏](/Users/a111/Workspace/projects/aramgg_client/src/main/services/feedback-log-collector.ts:26)、[反馈附件](/Users/a111/Workspace/projects/aramgg_client/src/main/services/feedback-service.ts:83)。
+位置：[部分识别截图保存](../../../../../src/main/auto-screenshot-service.ts:1077)、[慢 OCR 日志](../../../../../src/main/image-analyzer.ts:1496)、[反馈日志脱敏](../../../../../src/main/services/feedback-log-collector.ts:26)、[反馈附件](../../../../../src/main/services/feedback-service.ts:83)。
 
 识别出 1–2 张卡时会自动保存传入的整帧截图，而非仅保留标题区域。已有 10 秒节流和最多 60 张限制，但这条路径没有用户开启的诊断开关。由于默认整屏捕获，若对局仍进行而用户切到其他应用、且误识别满足条件，留存内容可能包含桌面内容。
 
@@ -82,7 +84,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 ### A4 · 自动更新缺少签名硬门禁
 
-位置：[签名配置](/Users/a111/Workspace/projects/aramgg_client/package.json:77)、[信任根常量](/Users/a111/Workspace/projects/aramgg_client/src/main/app-update-service.ts:84)、[验证器覆盖](/Users/a111/Workspace/projects/aramgg_client/src/main/app-update-service.ts:210)、[启用条件](/Users/a111/Workspace/projects/aramgg_client/src/main/app-update-service.ts:266)。
+位置：[签名配置](../../../../../package.json:77)、[信任根常量](../../../../../src/main/app-update-service.ts:84)、[验证器覆盖](../../../../../src/main/app-update-service.ts:210)、[启用条件](../../../../../src/main/app-update-service.ts:266)。
 
 当前 `verifyUpdateCodeSignature=false`，`REQUIRE_SIGNED_WINDOWS_UPDATES=false`，内置发布者列表为空；代码把签名验证器替换成始终成功的函数。自动更新默认关闭，但远端配置或环境开关可以开启，启用逻辑没有同时要求签名与发布者已配置。
 
@@ -108,7 +110,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 ### B1 · 英文匹配仍可能阻塞主进程
 
-位置：[标题逐槽匹配](/Users/a111/Workspace/projects/aramgg_client/src/main/image-analyzer.ts:1404)、[候选预过滤](/Users/a111/Workspace/projects/aramgg_client/src/main/image-analyzer.ts:2026)、[数据库匹配](/Users/a111/Workspace/projects/aramgg_client/src/main/image-analyzer.ts:2054)。
+位置：[标题逐槽匹配](../../../../../src/main/image-analyzer.ts:1404)、[候选预过滤](../../../../../src/main/image-analyzer.ts:2026)、[数据库匹配](../../../../../src/main/image-analyzer.ts:2054)。
 
 当前已有候选预过滤和精确名称缓存，中文短文本效果较好。预过滤只要求共享字符，对英文常用字母的筛选力较弱，之后会执行同步滑窗编辑距离计算。标题长度限制在匹配调用之后，无法提前挡住该成本。
 
@@ -130,7 +132,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 ### B2 · 保留必要窗口预加载，评估基础包成本
 
-位置：[启动创建四个窗口](/Users/a111/Workspace/projects/aramgg_client/src/main/modules/app-config.ts:166)、[渲染入口](/Users/a111/Workspace/projects/aramgg_client/src/renderer/main.js:7)、[Firebase 静态导入](/Users/a111/Workspace/projects/aramgg_client/src/renderer/services/analytics.ts:1)。
+位置：[启动创建四个窗口](../../../../../src/main/modules/app-config.ts:166)、[渲染入口](../../../../../src/renderer/main.js:7)、[Firebase 静态导入](../../../../../src/renderer/services/analytics.ts:1)。
 
 启动依次创建主窗口、英雄详情、顶部浮窗和右侧面板，后三个即使隐藏也创建了页面。所有窗口共用渲染入口，入口静态导入 Firebase；只在主窗口初始化统计，并不等于其他窗口没有加载/解析相关代码。
 
@@ -138,7 +140,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 ### B3 · 把英雄状态监控收敛到一处
 
-位置：[渲染进程轮询](/Users/a111/Workspace/projects/aramgg_client/src/renderer/components/ChampionMonitor.vue:55)、[主进程 LCU 轮询](/Users/a111/Workspace/projects/aramgg_client/src/main/modules/app-config.ts:1349)。
+位置：[渲染进程轮询](../../../../../src/renderer/components/ChampionMonitor.vue:55)、[主进程 LCU 轮询](../../../../../src/main/modules/app-config.ts:1349)。
 
 主进程已有 gameflow 监听和轮询；主窗口组件仍每 2 秒请求快照，失败后再查英雄 ID。有英雄 ID 时每次都写 `lastSelectedChampionId`，只有胜率查询做了英雄变化判定。其 async `setInterval` 没有 in-flight 约束，请求超过周期时会重叠。
 
@@ -146,7 +148,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 ### B4 · 默认整屏捕获与游戏位置不一致
 
-位置：[默认捕获设置](/Users/a111/Workspace/projects/aramgg_client/src/main/auto-screenshot-service.ts:218)、[屏幕选择](/Users/a111/Workspace/projects/aramgg_client/src/main/screenshot.ts:174)。
+位置：[默认捕获设置](../../../../../src/main/auto-screenshot-service.ts:218)、[屏幕选择](../../../../../src/main/screenshot.ts:174)。
 
 默认 `preferScreenCapture=true`，屏幕来源路径取 `screens[0]`，没有绑定游戏所在显示器。游戏在第二块屏幕时可能抓错；对局进行中切到桌面也没有前台可见性门禁，仍会处理无关帧。
 
@@ -154,7 +156,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 ### B5 · 赛后海报的超时和幂等不完整
 
-位置：[图片内联](/Users/a111/Workspace/projects/aramgg_client/src/main/services/post-game-share.ts:977)、[海报准备](/Users/a111/Workspace/projects/aramgg_client/src/main/services/post-game-share.ts:1162)、[多阶段触发](/Users/a111/Workspace/projects/aramgg_client/src/main/modules/app-config.ts:1239)。
+位置：[图片内联](../../../../../src/main/services/post-game-share.ts:977)、[海报准备](../../../../../src/main/services/post-game-share.ts:1162)、[多阶段触发](../../../../../src/main/modules/app-config.ts:1239)。
 
 图片请求的 1800ms `Promise.race` 只等待响应头，随后 `arrayBuffer()` 不受该超时限制，也没有取消底层请求；2MB 限制在完整读入后才检查。服务器返回头后持续拖延响应体时，海报准备可能长期 pending，后续调用复用同一准备 Promise。
 
@@ -164,7 +166,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 ### B6 · 为长期缓存和反馈日志设置明确预算
 
-位置：[数据缓存](/Users/a111/Workspace/projects/aramgg_client/src/main/data-loader.ts:138)、[版本文件命中](/Users/a111/Workspace/projects/aramgg_client/src/main/data-loader.ts:822)、[清理接口](/Users/a111/Workspace/projects/aramgg_client/src/main/data-loader.ts:2652)、[反馈归档](/Users/a111/Workspace/projects/aramgg_client/src/main/services/feedback-log-collector.ts:61)。
+位置：[数据缓存](../../../../../src/main/data-loader.ts:138)、[版本文件命中](../../../../../src/main/data-loader.ts:822)、[清理接口](../../../../../src/main/data-loader.ts:2652)、[反馈归档](../../../../../src/main/services/feedback-log-collector.ts:61)。
 
 版本文件按 locale/version/path 缓存；该命中路径不检查 TTL，版本切换未发现对应旧版本淘汰，`clearCache` 未找到运行时调用。长时间运行并经历版本/语言变化时可能保留旧数据；这是留存策略问题，本次未做长时间 heap 对比，不能直接称为已量化的内存泄漏。磁盘历史版本也需要明确保留策略。
 
@@ -174,7 +176,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 ### C1 · 战绩文字没有跟随已完成的语言切换
 
-位置：[战绩页面缓存](/Users/a111/Workspace/projects/aramgg_client/src/renderer/components/MatchHistoryPanel.vue:158)、[资产名称加载](/Users/a111/Workspace/projects/aramgg_client/src/main/services/match-history/hextech-aram-query-service.ts:239)。
+位置：[战绩页面缓存](../../../../../src/renderer/components/MatchHistoryPanel.vue:158)、[资产名称加载](../../../../../src/main/services/match-history/hextech-aram-query-service.ts:239)。
 
 页面只在 mounted/翻页/刷新时查询，已返回的英雄、装备、增幅名称存入 page。浏览器中先加载中文战绩，再通过现有选择器切到英文，界面标题已为英文，旧战绩仍是“寒冰射手/超凡邪恶”。模拟查询服务会按新 locale 返回英文，说明问题在于当前页面没有触发重新取标签，而非预览服务一直返回中文。
 
@@ -182,7 +184,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 ### C2 · 弹窗键盘交互不完整
 
-位置：[退出/更新日志弹窗](/Users/a111/Workspace/projects/aramgg_client/src/renderer/components/Display.vue:301)。
+位置：[退出/更新日志弹窗](../../../../../src/renderer/components/Display.vue:301)。
 
 更新日志虽然声明 `role=dialog`、`aria-modal=true`，打开后焦点仍在背后按钮，Esc 无效；Shift-Tab 实测可以把焦点移到背后的 GitHub 链接。角色属性不会自动实现这些行为。
 
@@ -190,7 +192,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 ### C3 · 小窗口可用性比视觉风格更值得优先调整
 
-位置：[反馈悬浮入口](/Users/a111/Workspace/projects/aramgg_client/src/renderer/styles/feedback-widget.css:10)、[战绩小字](/Users/a111/Workspace/projects/aramgg_client/src/renderer/components/MatchHistoryPanel.vue:470)、[主窗口边界](/Users/a111/Workspace/projects/aramgg_client/src/main/modules/window-manager.ts:69)。
+位置：[反馈悬浮入口](../../../../../src/renderer/styles/feedback-widget.css:10)、[战绩小字](../../../../../src/renderer/components/MatchHistoryPanel.vue:470)、[主窗口边界](../../../../../src/main/modules/window-manager.ts:69)。
 
 - **遮挡已复现**：360×600 英文界面中，反馈按钮 rect 为 `(216,477,128,44)`，装备设置开关为 `(279,462.703,42,24)`，垂直重叠约 9.7px。建议收进 footer 或预留固定空间；缩窄后可用图标入口。验收滚动全页时任何按钮和开关都不被覆盖。
 - **标签可读性**：战绩图标下名称计算字号为 8px，状态辅助文字多为 10px。建议关键文字 12–14px、辅助文字至少按 11–12px 设计并用实际 DPI 检查，装备全名改为可访问 tooltip/详情。这里是设计建议，不声称存在通用 WCAG 最小字号规则。
@@ -199,14 +201,14 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 
 保留统一颜色、边框和状态样式，先修这些可操作性问题；不要把主窗口重构时的英雄候选推荐移回首页，现有业务约束要求其保留在英雄详情窗口。
 
-![默认主窗口，模拟数据](/Users/a111/Workspace/projects/aramgg_client/docs/audits/2026-09-05/ui-default.png)
+![默认主窗口，模拟数据](./ui-default.png)
 
-![360×600 英文窗口：反馈入口遮挡设置](/Users/a111/Workspace/projects/aramgg_client/docs/audits/2026-09-05/ui-narrow-en.png)
+![360×600 英文窗口：反馈入口遮挡设置](./ui-narrow-en.png)
 
 ## D · 工程与发布流程
 
 1. **把发布检查前移到 PR。** 仓库内仅有 Windows release workflow，触发器是 v 标签和手工运行，没有 PR 检查工作流；OCR fixture 命令也未列入发布检查。建议 PR 执行 lint/type/unit/build，OCR相关变更运行 fixture；Windows 打包与实际模型加载保留发布验收。仓库配置不能证明 GitHub 外部绝无其他检查，本次没有查询远端分支保护设置。
-2. **修复已知失败基线。** 本次唯一标准单测失败位于 [ONNX 路径测试](/Users/a111/Workspace/projects/aramgg_client/tests/unit/onnxruntime-native-path.test.ts:40)：测试在 macOS 传入 win32，但函数仍使用宿主 `path.join`，构造的分隔符不满足 Windows 预期。建议显式选择对应平台的 path 实现或调整测试边界，在 Windows/macOS 都恢复全绿；不要永久忽略这一项，也不要据此认定 Windows 原生模块已经无法运行。
+2. **修复已知失败基线。** 本次唯一标准单测失败位于 [ONNX 路径测试](../../../../../tests/unit/onnxruntime-native-path.test.ts:40)：测试在 macOS 传入 win32，但函数仍使用宿主 `path.join`，构造的分隔符不满足 Windows 预期。建议显式选择对应平台的 path 实现或调整测试边界，在 Windows/macOS 都恢复全绿；不要永久忽略这一项，也不要据此认定 Windows 原生模块已经无法运行。
 3. **逐步恢复核心类型保护。** `image-analyzer.ts`、`auto-screenshot-service.ts`、`modules/app-config.ts`、`services/analytics-service.ts` 顶部有 `@ts-nocheck`。先给任务代次、OCR结果、gameflow与通知负载补类型并去掉对应文件豁免，不进行一次性大重写。
 4. **让测试覆盖实际生产函数。** 当前三张 OCR 截图使用四条词典，且多语言 fixture 名称实质仍是中文；不足以覆盖完整词典成本、英文/繁中画面、多屏与槽位变换。生产匹配器与单独的 `augment-title-matcher` 工具还有逻辑重复，避免只测工具却没有让生产代码复用它。引入真实三语言标题样本、完整词典未命中场景和 A1/A2 生命周期用例。
 5. **按职责拆分热点文件。** 约 171 个源文件、4.2 万行，部分 Vue/主进程文件超过 1500–3000 行。大文件首先增加变更耦合，不自动代表运行慢。后续围绕截图调度、匹配、窗口展示和偏好状态逐项抽取，不开展与修复无关的整库格式化或迁移。
@@ -228,7 +230,7 @@ P1 表示建议在下一轮发布前处理，P2 表示随后安排；“实测�
 | 4 | 战绩语言、对话框键盘、窄窗口和信息组织 | 三语言/常见 DPI 可操作；无遮挡；Tab/Esc/焦点恢复正确 |
 | 5 | 海报超时和幂等、缓存/日志预算 | 慢 body 不阻塞后续准备；同局重复通知受控；长期与大数据峰值受限 |
 
-性能验收应延续 [性能诊断文档](/Users/a111/Workspace/projects/aramgg_client/docs/PERFORMANCE_DIAGNOSTICS.md)，使用同一 Windows 机器、同一构建模式，分别测：League 未运行、客户端大厅/选人、对局非增幅界面、增幅选择/连续刷新、Alt-Tab、多屏，以及一局结束到下一局。
+性能验收应延续 [性能诊断文档](../../../../PERFORMANCE_DIAGNOSTICS.md)，使用同一 Windows 机器、同一构建模式，分别测：League 未运行、客户端大厅/选人、对局非增幅界面、增幅选择/连续刷新、Alt-Tab、多屏，以及一局结束到下一局。
 
 每段记录各进程 CPU/内存、事件循环延迟 p95、捕获/门禁/OCR/匹配各阶段 p50/p95、LCU 请求量与最大并发、窗口可见性和 gameflow。开发模式与安装包数据分开，避免只看一个总 CPU 数字。具体性能预算应从这组基线制定，本次不填未经实测的“降温百分比”或承诺值。
 

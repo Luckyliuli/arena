@@ -1,3 +1,5 @@
+> **状态：历史快照（2026-09-05）。** 本文只代表当时的审查、诊断或建议，不应作为当前 backlog 或当前行为说明；其中的源码路径和行号对应记录当时版本，可能已随仓库移动而失效。当前入口见 [docs/README.md](../../README.md)，当前开放事项见 [docs/STATUS.md](../../STATUS.md)，架构事实见 [COMPLETE_ARCHITECTURE.md](../../../COMPLETE_ARCHITECTURE.md)。
+
 # 启动窗口与英雄监控优化 · 2026-09-05
 
 基于 `431a93d` / `0.2.15` 的本地修复，尚未提交、打包发布或进行 Windows 对局实测。此前审查报告是修复前的基线；本次修复 A2、B3，并保留 B2 中四个必要窗口的启动预加载。
@@ -24,7 +26,7 @@
 
 没有改动 LCU 操作权限、推荐范围、数据语言准备顺序、截图频率或 OCR 匹配算法。Firebase 的静态导入不属于本次修复；其它审查条目仍需单独处理。
 
-主要实现位于 [主进程状态](/Users/a111/Workspace/projects/aramgg_client/src/main/modules/champion-monitor-state.ts)、[界面订阅](/Users/a111/Workspace/projects/aramgg_client/src/renderer/components/ChampionMonitor.vue)、[窗口管理](/Users/a111/Workspace/projects/aramgg_client/src/main/modules/window-manager.ts)、[窗口创建合并](/Users/a111/Workspace/projects/aramgg_client/src/main/modules/lazy-window.ts)和[页面就绪等待](/Users/a111/Workspace/projects/aramgg_client/src/main/modules/renderer-ready.ts)。
+主要实现位于 [主进程状态](../../../../../src/main/modules/champion-monitor-state.ts)、[界面订阅](../../../../../src/renderer/components/ChampionMonitor.vue)、[窗口管理](../../../../../src/main/modules/window-manager.ts)、[窗口创建合并](../../../../../src/main/modules/lazy-window.ts)和[页面就绪等待](../../../../../src/main/modules/renderer-ready.ts)。
 
 ## 验证
 
@@ -49,7 +51,7 @@
 
 前一轮检查输出保存在 `/private/tmp/aramgg-monitor-fix-20260905/`；恢复四窗口预加载后的检查输出保存在 `/private/tmp/aramgg-monitor-prewarm-20260905/`。常规检查并行执行，OCR 日志耗时受同时构建和测试影响，只作为正确性验证，不作为前后性能比较。
 
-下一层验收是同一台 Windows 机器的安装包：分别记录未启动 League、大厅、选人、对局、Alt-Tab 时的窗口数、进程内存与 CPU，并验证三种辅助窗口首开、用户关闭后的行为和三语言加载。参考 [性能诊断文档](/Users/a111/Workspace/projects/aramgg_client/docs/PERFORMANCE_DIAGNOSTICS.md)。
+下一层验收是同一台 Windows 机器的安装包：分别记录未启动 League、大厅、选人、对局、Alt-Tab 时的窗口数、进程内存与 CPU，并验证三种辅助窗口首开、用户关闭后的行为和三语言加载。参考 [性能诊断文档](../../../../PERFORMANCE_DIAGNOSTICS.md)。
 
 ## 2026-09-07 发布复核
 

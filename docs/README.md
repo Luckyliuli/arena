@@ -14,12 +14,12 @@
 
 | 主题 | 文档 | 状态 |
 | --- | --- | --- |
-| 产品入口（中文） | [README.md](../README.md) | 当前；斗魂竞技场范围仍在补齐 |
-| Product entry (English) | [README.en.md](../README.en.md) | 当前；斗魂竞技场范围仍在补齐 |
-| 完整架构 | [COMPLETE_ARCHITECTURE.md](../COMPLETE_ARCHITECTURE.md) | 当前；需要补充 Arena/斗魂模块 |
+| 产品入口（中文） | [README.md](../README.md) | 当前 |
+| Product entry (English) | [README.en.md](../README.en.md) | 当前 |
+| 完整架构 | [COMPLETE_ARCHITECTURE.md](../COMPLETE_ARCHITECTURE.md) | 当前 |
 | 领域词汇 | [CONTEXT.md](../CONTEXT.md) | 当前 |
 | 仓库协作规范 | [AGENTS.md](../AGENTS.md) | 当前 |
-| AI 协作者规则 | [CLAUDE.md](../CLAUDE.md) | 当前；与 AGENTS.md 有重叠，待收敛 |
+| AI 协作者规则 | [CLAUDE.md](../CLAUDE.md) | 当前；以 AGENTS.md 为规则源 |
 | UI 设计系统 | [DESIGN.md](../DESIGN.md) | 当前 |
 
 ## 使用与运行指南
@@ -51,21 +51,22 @@
 
 | 文档 | 状态 |
 | --- | --- |
-| [CODEBASE_AUDIT_2026-05-26.md](./CODEBASE_AUDIT_2026-05-26.md) | 快照 |
-| [CODE_REVIEW_2026-07-10.md](./CODE_REVIEW_2026-07-10.md) | 快照 |
-| [LOCALIZED_CLIENT_DATA_REVIEW_2026-07-10.md](./LOCALIZED_CLIENT_DATA_REVIEW_2026-07-10.md) | 快照 |
-| [PROJECT_RECOMMENDATIONS_2026-07-10.md](./PROJECT_RECOMMENDATIONS_2026-07-10.md) | 快照 |
-| [CLIENT_LOG_OPTIMIZATION_2026-08-26.md](./CLIENT_LOG_OPTIMIZATION_2026-08-26.md) | 快照 |
-| [CLIENT_MONITOR_OPTIMIZATION_2026-09-05.md](./CLIENT_MONITOR_OPTIMIZATION_2026-09-05.md) | 快照 |
-| [REPOSITORY_AUDIT_2026-09-05.md](./REPOSITORY_AUDIT_2026-09-05.md) | 快照 |
+| [项目全面审查（2026-05-26）](./audits/2026-05-26/codebase-audit.md) | 快照 |
+| [项目代码全面审查（2026-07-10）](./audits/2026-07-10/code-review.md) | 快照 |
+| [客户端多语言数据专项审查（2026-07-10）](./audits/2026-07-10/localized-client-data-review.md) | 快照 |
+| [项目改进建议（2026-07-10）](./audits/2026-07-10/project-recommendations.md) | 快照 |
+| [客户端日志优化诊断（2026-08-26）](./audits/2026-08-26/client-log-optimization.md) | 快照 |
+| [启动窗口与英雄监控优化（2026-09-05）](./audits/2026-09-05/client-monitor-optimization.md) | 快照 |
+| [仓库审查（2026-09-05）](./audits/2026-09-05/repository-audit.md) | 快照 |
 | [ELECTRON_VITE_MIGRATION_PROGRESS.md](./ELECTRON_VITE_MIGRATION_PROGRESS.md) | 迁移快照；当前架构以 COMPLETE_ARCHITECTURE.md 为准 |
 | [ARAM_LCU_READONLY_RECOMMENDATION_PROGRESS.md](./ARAM_LCU_READONLY_RECOMMENDATION_PROGRESS.md) | 功能进度快照 |
 | [requirements.md](./requirements.md) | 待整理；当前内容明显是早期 ARAM 规格，尚未覆盖 Arena |
 
-## 当前整理报告
+## 当前状态与整理报告
 
 | 内容 | 文档 | 状态 |
 | --- | --- | --- |
+| 唯一当前 backlog | [STATUS.md](./STATUS.md) | 当前 |
 | 本次全量盘查、重复组与迁移顺序 | [DOCUMENTATION_AUDIT.md](./DOCUMENTATION_AUDIT.md) | 当前 |
 
 ## 归档

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/readme/hero.svg" width="100%" alt="ARAMGG Assistant with read-only LCU guidance, local Augment OCR, and in-game recommendation overlays" />
+  <img src="./assets/readme/hero.svg" width="100%" alt="ARAMGG Assistant with read-only LCU guidance for ARAM and Arena, local Augment OCR, and in-game recommendation overlays" />
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  A Windows desktop companion for League of Legends ARAM: get champion and bench guidance in champion select, recognize all three Augment cards in-game, and keep win-rate, build, and skill recommendations beside the match.
+  A Windows desktop companion for League of Legends ARAM and Arena: get champion and bench guidance in champion select, recognize Augments in-game, and keep win-rate, build, and skill recommendations beside the match. Arena also adds prismatic items and augment, champion, and combination leaderboards.
 </p>
 
 <p align="center">
@@ -53,6 +53,8 @@
 > [!IMPORTANT]
 > Recommendation flows read state and statistics only. ARAMGG never picks a champion, swaps the bench, locks in, or accepts a trade; every game action stays with the player.
 
+Arena uses the same local-first data, read-only LCU, and incremental OCR principles, with additional coverage for prismatic items, augment/champion/combination leaderboards, and managed item sets.
+
 ## More than a data overlay
 
 - **Game-stage aware.** LCU gameflow decides when champion-select guidance is relevant and when in-game OCR may run. Stale results are cleared after the match stage ends.
@@ -64,7 +66,7 @@
 
 1. Download the latest `aramgg_client Setup <version>.exe` from [Releases](https://github.com/valkia/aramgg_client/releases/latest).
 2. Install and launch ARAMGG Assistant, then launch League Client. The app discovers LCU from the running client first.
-3. Enter ARAM: use the champion detail window during champion select, then wait for an Augment selection screen in-game.
+3. Enter ARAM or Arena: use the champion detail window during champion select, then wait for an Augment selection screen in-game.
 4. If automatic recognition misses, press `F8` to force a full-size augment refresh without waiting for the automatic capture cooldown.
 
 The game-directory setting is not required for normal use. It is an advanced fallback for reading the LCU lockfile and logs only when process-first discovery fails.

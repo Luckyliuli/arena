@@ -1,6 +1,8 @@
 # CLAUDE.md
 
-本文件是项目内 AI 协作者的规则手册。详细历史和实现说明放在 `docs/`，这里仅保留会影响下次写代码的事实和红线。
+> 仓库规则以 [AGENTS.md](./AGENTS.md) 为准；本文件只保留 Claude 运行时补充和中文工作偏好。规则冲突时，以 AGENTS.md 和当前源码为准。
+
+本文件记录 Claude 运行时补充和中文工作偏好；仓库级规则以 [AGENTS.md](./AGENTS.md) 为准，详细历史和实现说明放在 `docs/`。
 
 ## 工作语言
 
@@ -99,6 +101,7 @@ node tests/electron/test-augment-ocr-fixtures.js
 ## 文档指针
 
 - 文档总索引：`docs/README.md`
+- 当前状态与开放事项：`docs/STATUS.md`
 - 架构总览：`COMPLETE_ARCHITECTURE.md`
 - Electron 迁移和安全状态：`docs/ELECTRON_VITE_MIGRATION_PROGRESS.md`
 - ARAM LCU 只读推荐：`docs/ARAM_LCU_READONLY_RECOMMENDATION_PROGRESS.md`
@@ -107,7 +110,7 @@ node tests/electron/test-augment-ocr-fixtures.js
 - 自动海克斯：`docs/USER_GUIDE_AUTO_AUGMENT.md`
 - 性能与发热排查：`docs/PERFORMANCE_DIAGNOSTICS.md`
 - 客户端数据 API：`docs/client-api-strategy.md`
-- 客户端多语言数据专项审查：`docs/LOCALIZED_CLIENT_DATA_REVIEW_2026-07-10.md`
-- 全项目代码审查与整改状态：`docs/CODE_REVIEW_2026-07-10.md`
+- 客户端多语言数据专项审查：`docs/audits/2026-07-10/localized-client-data-review.md`
+- 全项目代码审查与整改状态：`docs/audits/2026-07-10/code-review.md`
 - Electron 更新方案：`docs/ELECTRON_APP_UPDATE_STRATEGY.md`
-- 项目改进建议与实施进度：`docs/PROJECT_RECOMMENDATIONS_2026-07-10.md`
+- 项目改进建议与实施进度：`docs/audits/2026-07-10/project-recommendations.md`

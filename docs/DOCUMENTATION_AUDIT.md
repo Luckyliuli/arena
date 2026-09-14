@@ -99,10 +99,10 @@
 
 **证据：**
 
-- `docs/CODEBASE_AUDIT_2026-05-26.md:11` 是“当前状态索引”，`:45` 是“当前剩余 P1”，`:49` 是“当前剩余 P2 / P3”。
-- `docs/CODE_REVIEW_2026-07-10.md:17` 有“后续整改进展”，后面继续列 P1/P2/P3。
-- `docs/PROJECT_RECOMMENDATIONS_2026-07-10.md:12` 有“实施进度”，`:273` 又有“后续实施顺序”。
-- `docs/REPOSITORY_AUDIT_2026-09-05.md:29` 是“优先级清单”，`:221` 又是“建议实施顺序与验收”。
+- `docs/audits/2026-05-26/codebase-audit.md:11` 是“当前状态索引”，`:45` 是“当前剩余 P1”，`:49` 是“当前剩余 P2 / P3”。
+- `docs/audits/2026-07-10/code-review.md:17` 有“后续整改进展”，后面继续列 P1/P2/P3。
+- `docs/audits/2026-07-10/project-recommendations.md:12` 有“实施进度”，`:273` 又有“后续实施顺序”。
+- `docs/audits/2026-09-05/repository-audit.md:29` 是“优先级清单”，`:221` 又是“建议实施顺序与验收”。
 - `docs/ELECTRON_VITE_MIGRATION_PROGRESS.md:108` 保留“当前执行记录”，`:215` 保留“下一步”。
 - `docs/ARAM_LCU_READONLY_RECOMMENDATION_PROGRESS.md:27,39,230` 同时包含当前基础、当前判断和后续注意事项。
 
@@ -125,8 +125,8 @@
 ### P2：性能 / 优化文档有内容交叠，但用途应分清
 
 - `docs/PERFORMANCE_DIAGNOSTICS.md` 负责“如何采样、如何判断当前性能问题”，可保留为当前指南。
-- `docs/CLIENT_LOG_OPTIMIZATION_2026-08-26.md:3,79` 是特定日期的日志问题和建议清单，应视为快照。
-- `docs/CLIENT_MONITOR_OPTIMIZATION_2026-09-05.md:1,11` 是特定日期的启动窗口/英雄监控优化记录，应视为快照。
+- `docs/audits/2026-08-26/client-log-optimization.md:3,79` 是特定日期的日志问题和建议清单，应视为快照。
+- `docs/audits/2026-09-05/client-monitor-optimization.md:1,11` 是特定日期的启动窗口/英雄监控优化记录，应视为快照。
 
 **建议：** 当前指南只保留采样和判断口径；历史问题列表归档到带日期的证据/快照目录。
 
@@ -143,20 +143,20 @@
 | 历史迁移文档 | `docs/archive/2026-01-legacy/*`、`ELECTRON_VITE_MIGRATION_PROGRESS.md`、`TYPESCRIPT_INTEGRATION.md` | 迁移过程、命令和完成报告 | 当前约定文档 | 归档层保持；当前文档只留可执行约定 |
 | 本地 upstream 副本 | `.scratch/aramgg-upstream/**` | 整套 tracked/upstream 文档的本地副本 | 无 | `.gitignore` 已排除；确认不再比对后可本地清理，不影响 Git |
 
-## 建议的目标结构
+## 已执行的结构整理
 
-不要求本轮立刻搬迁。建议下一步按这个最小结构收敛：
+当前仓库已经采用以下最小结构：
 
 ```text
-README.md / README.en.md            # 产品入口，只保留用户必读
-AGENTS.md                           # 唯一跨工具工程规则
-CLAUDE.md                           # 仅 Claude 差异补充，链接 AGENTS.md
+README.md / README.en.md            # 产品入口
+AGENTS.md                           # 跨工具规则源
+CLAUDE.md                           # Claude 差异补充，并声明 AGENTS.md 优先
 CONTEXT.md                          # 领域词汇
-COMPLETE_ARCHITECTURE.md            # 当前架构，补 Arena
+COMPLETE_ARCHITECTURE.md            # 当前架构（已补 Arena 概览）
 DESIGN.md                           # UI 设计事实源
 docs/
-  README.md                         # 当前文档总索引
-  STATUS.md                         # 唯一当前 backlog（待创建）
+  README.md                         # 文档总索引
+  STATUS.md                         # 唯一当前 backlog
   USER_GUIDE_AUTO_AUGMENT.md
   GAMEFLOW_DETECTION_GUIDE.md
   LCU_TROUBLESHOOTING.md
@@ -168,22 +168,21 @@ docs/
   TYPESCRIPT_INTEGRATION.md
   api/                              # OpenAPI
   samples/                          # 脱敏样本
-  audits/<YYYY-MM-DD>/              # 原始证据
-  archive/                          # 历史文档
+  audits/<YYYY-MM-DD>/              # 历史审查报告和原始证据
+  archive/                          # 早期实现记录
 ```
 
-## 建议执行顺序
+## 已完成的整理
 
-1. **本轮已完成：** 修正 F1/F8，增加 `docs/README.md`，把 README 中英文和 `CLAUDE.md` 的入口接到总索引。
-2. **下一轮文档更新：** 给 README、README.en、COMPLETE_ARCHITECTURE 增加 Arena/斗魂范围，并检查 USER_GUIDE 的 Arena 使用流程。
-3. **收敛 Agent 规则：** 明确 `AGENTS.md` 为唯一规则源，`CLAUDE.md` 只保留差异；保留本轮 `.scratch/` 修正。
-4. **建立当前 backlog：** 新建 `docs/STATUS.md`，从各日期报告中提取仍开放的事项；日期报告不再维护“当前状态”。
-5. **归档迁移快照：** 将 `CODEBASE_AUDIT_2026-05-26`、`CODE_REVIEW_2026-07-10`、`PROJECT_RECOMMENDATIONS_2026-07-10`、`CLIENT_*` 等按日期迁入 `docs/audits/<date>/` 时，先创建带状态头的索引，避免只移动文件而继续漂移。
-6. **处理 requirements：** 要么升级为当前双模式规格，要么标记为历史并归档；不要继续让它保持“无状态、无入口、可能与代码冲突”的中间态。
+1. 修正 README、README.en 和自动海克斯指南中的 `F1` 过期说明，统一为 `F8` 手动刷新。
+2. 新增 `docs/README.md` 并接入中英文 README 与 `CLAUDE.md`。
+3. 给 README、README.en 和 `COMPLETE_ARCHITECTURE.md` 补充 Arena / 斗魂竞技场范围。
+4. 将七份日期审查、评审和诊断文档迁入 `docs/audits/<日期>/`，并加历史快照状态头。
+5. 新增 `docs/STATUS.md`，作为唯一当前开放事项清单。
+6. 在 `CLAUDE.md` 声明 `AGENTS.md` 为规则源；完整内容收敛仍留在 `docs/STATUS.md`。
 
-## 本轮刻意没有做的事
+## 剩余待决策
 
-- 没有删除、移动或重命名任何现有文档。
-- 没有把 `docs/requirements.md` 强制标成历史，因为“继续维护它还是归档”是产品决策。
-- 没有把日期审查文档批量迁入 `docs/audits/`，因为当前没有统一的状态头和后端引用检查；先建立单一 backlog 更安全。
-- 没有清理 `.scratch/aramgg-upstream` 的本地副本；它被 Git 忽略，确认不再用于比对后再本地删除即可。
+- `docs/requirements.md` 是升级成 ARAM + Arena 双模式规格，还是标记为早期 ARAM 规格并归档。
+- `AGENTS.md` / `CLAUDE.md` 的完整去重：当前先声明优先级，尚未把全部重叠段落移除。
+- 本地 `.scratch/aramgg-upstream` 的清理；它已被 Git 忽略，不影响仓库提交。

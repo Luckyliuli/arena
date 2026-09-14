@@ -1,3 +1,5 @@
+> **状态：历史快照（2026-07-10）。** 本文只代表当时的审查、诊断或建议，不应作为当前 backlog 或当前行为说明；其中的源码路径和行号对应记录当时版本，可能已随仓库移动而失效。当前入口见 [docs/README.md](../../README.md)，当前开放事项见 [docs/STATUS.md](../../STATUS.md)，架构事实见 [COMPLETE_ARCHITECTURE.md](../../../COMPLETE_ARCHITECTURE.md)。
+
 # 项目代码全面审查报告
 
 > 审查日期：2026-07-10
@@ -55,7 +57,7 @@
 
 **证据**
 
-- [`src/main/modules/app-config.ts`](../src/main/modules/app-config.ts) 的 `showMainWindowForPostGameShare()` 调用 `getMainWindow()`。
+- [`src/main/modules/app-config.ts`](../../../src/main/modules/app-config.ts) 的 `showMainWindowForPostGameShare()` 调用 `getMainWindow()`。
 - 该文件从 `window-manager.ts` 导入的符号中没有 `getMainWindow`。
 - `prepareAndNotifyPostGameShare()` 会在 `WaitingForStats`、`PreEndOfGame` 和 `EndOfGame` 阶段被 fire-and-forget 调用。
 - 文件使用 `// @ts-nocheck`，现有 type-check 无法发现未定义符号。
@@ -76,10 +78,10 @@
 
 **证据**
 
-- [`src/main/data-loader.ts`](../src/main/data-loader.ts) 的 `normalizeDataPath()` 只替换反斜杠并移除开头 `/`，没有拒绝 `.`、`..`、盘符和绝对路径。
+- [`src/main/data-loader.ts`](../../../src/main/data-loader.ts) 的 `normalizeDataPath()` 只替换反斜杠并移除开头 `/`，没有拒绝 `.`、`..`、盘符和绝对路径。
 - `isRequiredBundledDataPath()` 接受所有以 `champion-shards/` 开头的路径。
 - `writeDataFileToDisk()` 将上述路径直接传入 `path.join(versionDir, dataPath)`。
-- [`scripts/fetch-client-data.mjs`](../scripts/fetch-client-data.mjs) 的 `normalizeDataPath()`、`isBundledDataPath()` 和 `downloadBundleFile()` 存在相同边界问题。
+- [`scripts/fetch-client-data.mjs`](../../../scripts/fetch-client-data.mjs) 的 `normalizeDataPath()`、`isBundledDataPath()` 和 `downloadBundleFile()` 存在相同边界问题。
 
 例如，恶意 manifest 路径：
 
@@ -107,7 +109,7 @@ champion-shards/../../../../config/config.json
 
 **证据**
 
-- [`src/main/data-loader.ts`](../src/main/data-loader.ts) 的 `readCurrentDataPointerCandidates()` 固定按“用户缓存、bundled data”顺序返回候选。
+- [`src/main/data-loader.ts`](../../../src/main/data-loader.ts) 的 `readCurrentDataPointerCandidates()` 固定按“用户缓存、bundled data”顺序返回候选。
 - `loadCachedActiveDataSet()` 返回第一个完整候选，没有先比较 `dataVersion`。
 - `loadCachedOcrAugmentLocaleData()` 使用相同顺序。
 - 审查时仓库中的 bundled data 是 `16.13.4`，OCR 测试实际加载了用户目录中的旧缓存 `16.11.4`。
@@ -132,7 +134,7 @@ champion-shards/../../../../config/config.json
 
 **证据**
 
-- [`src/main/services/analytics-service.ts`](../src/main/services/analytics-service.ts) 内置完整 Firebase 配置。
+- [`src/main/services/analytics-service.ts`](../../../src/main/services/analytics-service.ts) 内置完整 Firebase 配置。
 - 当远端没有明确 `analytics.enabled` 且用户没有历史偏好时，`remoteEnabled` 会因 Firebase 配置完整而变为 `true`。
 - preload 和 IPC 已提供 `analytics.setEnabled()`，但 renderer 中没有实际设置入口。
 - renderer 会发送应用启动、页面访问、错误等事件。
@@ -151,10 +153,10 @@ Firebase Web 配置本身不应被当作秘密；本问题的核心是默认同�
 
 **证据**
 
-- [`src/main/app-update-service.ts`](../src/main/app-update-service.ts) 允许远程客户端数据配置启用自动更新并指定 generic HTTPS feed。
+- [`src/main/app-update-service.ts`](../../../src/main/app-update-service.ts) 允许远程客户端数据配置启用自动更新并指定 generic HTTPS feed。
 - feed 只限制为 HTTPS，没有固定生产域名或签名信任根。
-- [`.github/workflows/release-windows.yml`](../.github/workflows/release-windows.yml) 设置 `CSC_IDENTITY_AUTO_DISCOVERY=false`。
-- [`package.json`](../package.json) 没有 `publisherName` 或自定义更新签名校验配置。
+- [`.github/workflows/release-windows.yml`](../../../.github/workflows/release-windows.yml) 设置 `CSC_IDENTITY_AUTO_DISCOVERY=false`。
+- [`package.json`](../../../package.json) 没有 `publisherName` 或自定义更新签名校验配置。
 
 当前 `autoUpdateEnabled` 默认保持关闭，因此风险尚未直接激活。但如果数据 API 被攻破，攻击者可同时控制更新开关、feed URL 和 feed 中的校验文件。
 
@@ -178,7 +180,7 @@ Firebase Web 配置本身不应被当作秘密；本问题的核心是默认同�
 
 **已确认良好**
 
-[`src/main/modules/window-manager.ts`](../src/main/modules/window-manager.ts) 的窗口配置已正确设置：
+[`src/main/modules/window-manager.ts`](../../../src/main/modules/window-manager.ts) 的窗口配置已正确设置：
 
 - `nodeIntegration: false`
 - `nodeIntegrationInWorker: false`
@@ -234,7 +236,7 @@ preload 暴露了配置修改、更新安装、截图、文件保存、LCU 和�
 
 ### P2-3：OCR fixture 测试依赖真实用户环境
 
-[`tests/electron/test-augment-ocr-fixtures.js`](../tests/electron/test-augment-ocr-fixtures.js) 直接导入完整生产 `image-analyzer.ts`。测试运行时会：
+[`tests/electron/test-augment-ocr-fixtures.js`](../../../tests/electron/test-augment-ocr-fixtures.js) 直接导入完整生产 `image-analyzer.ts`。测试运行时会：
 
 - 查询真实 LCU 进程；
 - 读取真实用户数据缓存；
@@ -309,7 +311,7 @@ renderer 只使用 Firebase App 和 Analytics，但 `firebase` 被列为生产�
 
 ### 6.3 路径和遗留代码
 
-- [`src/main/analyze-q4.ts`](../src/main/analyze-q4.ts) 已改为通过 `app-paths.ts` 获取运行时数据目录。
+- [`src/main/analyze-q4.ts`](../../../src/main/analyze-q4.ts) 已改为通过 `app-paths.ts` 获取运行时数据目录。
 - 旧 Vue 2 router、登录 API、数据源、renderer LCU 兼容层和旧 HTTP 链已确认无引用并删除。
 - `package.json` 已补齐 `description` 和 `author`。
 

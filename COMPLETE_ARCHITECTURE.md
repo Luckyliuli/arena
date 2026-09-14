@@ -2,7 +2,7 @@
 
 ## 项目目标
 
-`aramgg_client` 是一个英雄联盟 ARAM 辅助工具。它通过 LCU 读取游戏阶段和选人状态，通过截图/OCR 识别海克斯选择，并结合远端/本地统计数据展示只读推荐。
+`aramgg_client` 是一个英雄联盟 ARAM 与斗魂竞技场辅助工具。它通过 LCU 读取游戏阶段和选人状态，通过截图/OCR 识别海克斯选择，并结合远端/本地统计数据展示只读推荐。
 
 本项目不代替玩家操作：不自动选英雄、不自动换 bench、不自动锁定、不自动接受或拒绝交换。
 
@@ -134,6 +134,26 @@ OCR 会通过 LCU `/riotclient/region-locale` 获取当前游戏语言提示。�
 海克斯浮窗的胜率补齐优先在主进程完成，短等待内完成则随 `augment-detected` 一起发送；超时则先发送 pending payload，稍后再发送补齐后的结果。英雄海克斯推荐和基础海克斯详情按数据版本/英雄缓存，避免同一英雄刷新时重复映射和排序全量数据。
 
 海克斯详情弹窗和游戏内浮窗是隐藏后按事件显示的 overlay 窗口，并沿用 Electron 默认的后台节流策略。性能排查不得通过全局关闭 `backgroundThrottling` 掩盖问题；正式包发热的采样口径见 `docs/PERFORMANCE_DIAGNOSTICS.md`。
+
+### 斗魂竞技场（Arena）
+
+```text
+LCU gameflow
+  -> arena-session-service 识别 queue 1700 / gameMode CHERRY
+  -> InProgress 只表示对局中，不能推断 shopping phase
+  -> 视觉/OCR gate 提供 shoppingPhaseSignal
+  -> 海克斯和棱彩装备 OCR
+  -> augment-detected / arena-item-detected IPC events
+  -> Arena 浮窗、英雄详情和榜单
+  -> OP.GG 胜率数据（带磁盘 read-through 缓存）
+  -> 托管装备方案注入
+```
+
+Arena 身份来自 queue id `1700` 或 gameMode `CHERRY`；已知非 Arena 会话不得携带 Arena 英雄。`InProgress` 不能用来推断商店阶段，只有视觉/OCR gate 提供 `shoppingPhaseSignal` 后，会话状态才允许从 `unknowable` 前进。
+
+海克斯和棱彩装备统计默认使用真实 OP.GG 数据，并通过磁盘 read-through 缓存降低重复请求。英雄详情展示全部装备分类；游戏内棱彩装备弹窗只展示棱彩装备。海克斯与棱彩装备弹窗共用推荐度、梯队和胜率语义。
+
+榜单包含英雄符文榜、英雄胜率榜和三人/双人组合榜；随包快照负责立即渲染，后台最多每日刷新一次。托管 Arena 装备方案包含棱彩、核心、鞋子、起始（存在时）和最终装备区块，只在已选 Arena 英雄且 OP.GG 数据就绪后写入。
 
 ### 客户端版本提示、自动更新和更新日志
 

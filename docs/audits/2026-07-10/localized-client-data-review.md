@@ -1,3 +1,5 @@
+> **状态：历史快照（2026-07-10）。** 本文只代表当时的审查、诊断或建议，不应作为当前 backlog 或当前行为说明；其中的源码路径和行号对应记录当时版本，可能已随仓库移动而失效。当前入口见 [docs/README.md](../../README.md)，当前开放事项见 [docs/STATUS.md](../../STATUS.md)，架构事实见 [COMPLETE_ARCHITECTURE.md](../../../COMPLETE_ARCHITECTURE.md)。
+
 # 客户端多语言数据支持专项审查
 
 > 审查日期：2026-07-10
@@ -70,7 +72,7 @@
 
 **证据**
 
-- [`src/main/modules/ipc-handlers.ts`](../src/main/modules/ipc-handlers.ts#L438) 的 `locale-set` 处理器调用了 `notifyAllWindows`。
+- [`src/main/modules/ipc-handlers.ts`](../../../src/main/modules/ipc-handlers.ts#L438) 的 `locale-set` 处理器调用了 `notifyAllWindows`。
 - 该模块没有定义或导入 `notifyAllWindows`；现有同名函数属于 `app-config.ts` 的模块私有实现。
 - `setDataLocale()` 和 `store.set()` 在异常发生前已经执行。
 
@@ -96,11 +98,11 @@
 
 **证据**
 
-- [`scripts/fetch-client-data.mjs`](../scripts/fetch-client-data.mjs#L240) 只请求一次 `/api/client/v1/config`。
+- [`scripts/fetch-client-data.mjs`](../../../scripts/fetch-client-data.mjs#L240) 只请求一次 `/api/client/v1/config`。
 - 数据仍写入 `versions/<dataVersion>/`，指针仍只有 `current.json`。
-- [`src/main/data-loader.ts`](../src/main/data-loader.ts#L420) 对非默认语言只读取 `versions/<locale>/<dataVersion>/`。
+- [`src/main/data-loader.ts`](../../../src/main/data-loader.ts#L420) 对非默认语言只读取 `versions/<locale>/<dataVersion>/`。
 - `getCurrentDataFileNames()` 对英文和繁中只读取 `current.en-US.json`、`current.zh-TW.json`。
-- [`scripts/pack-electron.mjs`](../scripts/pack-electron.mjs#L153) 和 [`.github/workflows/release-windows.yml`](../.github/workflows/release-windows.yml#L70) 只检查 `current.json` 和默认语言 shard。
+- [`scripts/pack-electron.mjs`](../../../scripts/pack-electron.mjs#L153) 和 [`.github/workflows/release-windows.yml`](../../../.github/workflows/release-windows.yml#L70) 只检查 `current.json` 和默认语言 shard。
 - 审查时生成的 `resources/client-data/` 中不存在英文、繁中指针和语言版本目录。
 
 **影响**
@@ -129,9 +131,9 @@
 
 **证据**
 
-- [`src/main/image-analyzer.ts`](../src/main/image-analyzer.ts#L300) 的 `initAugmentDatabase()` 使用 `Promise.allSettled` 并发加载全部支持语言。
+- [`src/main/image-analyzer.ts`](../../../src/main/image-analyzer.ts#L300) 的 `initAugmentDatabase()` 使用 `Promise.allSettled` 并发加载全部支持语言。
 - `loadAugmentBaseForLocale()` 最终进入 `getActiveDataSet()`。
-- 无完整本地版本时，[`prepareDataVersion()`](../src/main/data-loader.ts#L1028) 会强制获取 champions、items、manifest 和全部 champion shards，而不只是 `augments.json`。
+- 无完整本地版本时，[`prepareDataVersion()`](../../../src/main/data-loader.ts#L1028) 会强制获取 champions、items、manifest 和全部 champion shards，而不只是 `augments.json`。
 
 **影响**
 
@@ -182,10 +184,10 @@
 
 **证据**
 
-- [`src/main/modules/ipc-handlers.ts`](../src/main/modules/ipc-handlers.ts#L1137) 的 `championDataLoadRequests` 只以 champion ID 作为 key。
-- [`src/renderer/components/AugmentWinrateOverlay.vue`](../src/renderer/components/AugmentWinrateOverlay.vue#L517) 的请求合并和 15 秒缓存也只比较 champion ID。
+- [`src/main/modules/ipc-handlers.ts`](../../../src/main/modules/ipc-handlers.ts#L1137) 的 `championDataLoadRequests` 只以 champion ID 作为 key。
+- [`src/renderer/components/AugmentWinrateOverlay.vue`](../../../src/renderer/components/AugmentWinrateOverlay.vue#L517) 的请求合并和 15 秒缓存也只比较 champion ID。
 - 只有设置页 `Display.vue` 监听 `locale-changed`；英雄详情和海克斯浮窗没有失效缓存或重新加载。
-- [`getChampionDetailData()`](../src/main/data-loader.ts#L2134) 只给部分子调用传入已捕获的数据 locale，其他调用继续读取可变的全局 locale。
+- [`getChampionDetailData()`](../../../src/main/data-loader.ts#L2134) 只给部分子调用传入已捕获的数据 locale，其他调用继续读取可变的全局 locale。
 
 **影响**
 
@@ -211,8 +213,8 @@
 
 **证据**
 
-- [`loadDataApiConfig()`](../src/main/data-loader.ts#L876) 接受没有 `locale` 的配置，并使用请求 locale 补齐。
-- [`loadManifestForConfig()`](../src/main/data-loader.ts#L957) 同样接受没有 `locale` 的 manifest。
+- [`loadDataApiConfig()`](../../../src/main/data-loader.ts#L876) 接受没有 `locale` 的配置，并使用请求 locale 补齐。
+- [`loadManifestForConfig()`](../../../src/main/data-loader.ts#L957) 同样接受没有 `locale` 的 manifest。
 - 如果服务端忽略 locale query 或返回旧格式默认中文数据，客户端仍会把它写入目标语言目录。
 
 **影响**

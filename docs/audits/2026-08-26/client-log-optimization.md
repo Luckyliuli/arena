@@ -1,3 +1,5 @@
+> **状态：历史快照（2026-08-26）。** 本文只代表当时的审查、诊断或建议，不应作为当前 backlog 或当前行为说明；其中的源码路径和行号对应记录当时版本，可能已随仓库移动而失效。当前入口见 [docs/README.md](../../README.md)，当前开放事项见 [docs/STATUS.md](../../STATUS.md)，架构事实见 [COMPLETE_ARCHITECTURE.md](../../../COMPLETE_ARCHITECTURE.md)。
+
 # ARAMGG 客户端日志优化诊断
 
 ## 文档状态
