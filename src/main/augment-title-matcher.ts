@@ -13,6 +13,7 @@ const MATCH_BLACKLIST = new Set([
 
 const OCR_NAME_ALIASES = new Map([
   ['一板一眼', ['板一眼']],
+  ['最万用的瞄准镜', ['用的目苗准镜', '用的苗准镜', '用的目苗准镜综合', '用的苗准镜综合']],
 ])
 
 type AugmentTitleRecord = {

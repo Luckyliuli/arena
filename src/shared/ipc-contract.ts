@@ -256,6 +256,8 @@ export interface ArenaOverlayAugmentPayload extends LooseRecord {
   notRecommendedForChampion?: boolean
   /** CommunityDragon special option, excluded from normal augment scoring. */
   isSpecialOption?: boolean
+  augmentLevel?: number | null
+  isUpgrade?: boolean
 }
 
 export interface OverlayPayload extends LooseRecord {

@@ -1398,6 +1398,8 @@ class AutoScreenshotService {
                     iconPath: aug.iconPath || null,
                     confidence: aug.confidence ?? null,
                     detectedSlot: Number.isInteger(aug.detectedSlot) ? aug.detectedSlot : index,
+                    augmentLevel: Number.isInteger(aug.augmentLevel) ? aug.augmentLevel : null,
+                    isUpgrade: aug.isUpgrade === true,
                     missing: aug.missing === true,
                 })),
                 analysisConfidence: analysisResult.analysis.confidence,

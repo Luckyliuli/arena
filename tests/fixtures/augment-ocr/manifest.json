@@ -4,8 +4,16 @@
     "description": "Full augment selection with three readable title slots. Ids are the Arena dictionary ids for these names; the ARAM-era ids this fixture used to assert do not exist in that catalog.",
     "expectedCardCount": 3,
     "expectTitleActivity": true,
-    "expectedIds": [32, 65, 129],
-    "expectedNames": ["裁决使", "超凡邪恶", "神射法师"]
+    "expectedIds": [
+      32,
+      65,
+      129
+    ],
+    "expectedNames": [
+      "裁决使",
+      "超凡邪恶",
+      "神射法师"
+    ]
   },
   {
     "file": "partial-one-card.png",
@@ -22,5 +30,25 @@
     "expectTitleActivity": false,
     "expectedIds": [],
     "expectedNames": []
+  },
+  {
+    "file": "upgrade-three-cards.png",
+    "description": "Real in-game upgrade card frame: all three candidates keep their augment ids and are level-up cards; the current OCR reliably reads one Lv.2 label and infers upgrade mode for the group.",
+    "expectedCardCount": 3,
+    "expectTitleActivity": true,
+    "expectUpgrade": true,
+    "expectedIds": [
+      115,
+      63,
+      74
+    ],
+    "expectedNames": [
+      "最万用的瞄准镜",
+      "狂徒豪气",
+      "缩小射线"
+    ],
+    "expectedLevelsById": {
+      "74": 2
+    }
   }
 ]

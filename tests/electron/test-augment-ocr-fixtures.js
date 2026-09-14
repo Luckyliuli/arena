@@ -64,6 +64,10 @@ function namesOf(augments = []) {
     return augments.map(augment => String(augment.name))
 }
 
+function levelsById(augments = []) {
+    return Object.fromEntries(augments.map(augment => [String(augment.id), augment.augmentLevel]).filter(([, level]) => level != null))
+}
+
 function enginesOf(slotDiagnostics = []) {
     return [...new Set(slotDiagnostics.map(diagnostic => diagnostic.ocrEngine).filter(Boolean))]
 }

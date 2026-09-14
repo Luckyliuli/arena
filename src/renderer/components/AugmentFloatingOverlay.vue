@@ -35,7 +35,12 @@
             </div>
 
             <div class="content">
-              <h3 class="name">{{ augment.missing ? '' : augment.name }}</h3>
+              <h3 class="name">
+                {{ augment.missing ? '' : augment.name }}
+                <span v-if="augment.isUpgrade" class="upgrade-badge">
+                  {{ augment.augmentLevel ? t('augment.upgradeLevel', { level: augment.augmentLevel }) : t('augment.upgrade') }}
+                </span>
+              </h3>
               <template v-if="!augment.missing">
                 <span v-if="augment.notRecommendedForChampion" class="recommend-label unavailable">
                   {{ t('augment.notRecommendedForChampion') }}
@@ -517,6 +522,19 @@ onBeforeUnmount(() => {
   border-color: rgba(226, 195, 132, 0.42);
   background: rgba(226, 195, 132, 0.12);
   color: #e2c384;
+}
+
+.upgrade-badge {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border: 1px solid rgba(129, 140, 248, 0.42);
+  border-radius: 4px;
+  background: rgba(99, 102, 241, 0.14);
+  color: #c7d2fe;
+  font-size: 9px;
+  font-weight: 900;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 .recommend-label.unavailable {
