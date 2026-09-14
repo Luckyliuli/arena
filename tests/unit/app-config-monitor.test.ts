@@ -14,12 +14,13 @@ const mocks = vi.hoisted(() => ({
   notify: vi.fn(),
   applyPopupPreferences: vi.fn(),
   logError: vi.fn(),
+  shortcutRegister: vi.fn(() => true),
   popup: { show: vi.fn(), isVisible: () => false, isDestroyed: () => false, webContents: { send: vi.fn() } },
 }))
 vi.mock('electron', () => ({
   app: { isPackaged: false, getVersion: () => 'test', on: vi.fn(), quit: vi.fn() },
   BrowserWindow: { getAllWindows: () => [] },
-  globalShortcut: { unregisterAll: vi.fn() },
+  globalShortcut: { unregisterAll: vi.fn(), register: mocks.shortcutRegister },
   Menu: { setApplicationMenu: vi.fn() },
 }))
 vi.mock('../../src/main/modules/logger.ts', () => ({ default: {
@@ -43,7 +44,7 @@ vi.mock('../../src/main/modules/ipc-handlers.ts', () => ({ registerIpcHandlers: 
 vi.mock('../../src/main/auto-screenshot-service.ts', () => ({ default: {
   isRunning: false, stop: vi.fn(() => true), getConfig: vi.fn(() => ({ controlOwner: 'gameflow' })),
   setGameflowPhase: vi.fn(), clearAugmentState: vi.fn(),
-  setConfig: vi.fn(), start: vi.fn(async () => true),
+  setConfig: vi.fn(), start: vi.fn(async () => true), triggerManualRefresh: vi.fn(),
 } }))
 vi.mock('../../src/main/services/lcu/lcu-service.ts', () => ({ getLCUServiceInstance: () => ({
   getAuthToken: async () => ({ url: 'https://127.0.0.1:2999' }),
@@ -128,6 +129,18 @@ describe('main-process monitoring ownership', () => {
     }
     expect(mocks.popup.show).not.toHaveBeenCalled()
     expect(mocks.popup.webContents.send).not.toHaveBeenCalled()
+  })
+
+  it('registers F8 to force a manual augment refresh', async () => {
+    await start()
+
+    expect(mocks.shortcutRegister).toHaveBeenCalledWith('F8', expect.any(Function))
+    const refresh = mocks.shortcutRegister.mock.calls.find(([accelerator]) => accelerator === 'F8')?.[1]
+    expect(refresh).toBeTypeOf('function')
+    refresh()
+
+    const { default: autoScreenshotService } = await import('../../src/main/auto-screenshot-service.ts')
+    expect(autoScreenshotService.triggerManualRefresh).toHaveBeenCalledWith('hotkey-F8')
   })
 
   it('waits for every auxiliary renderer before starting game monitoring', async () => {

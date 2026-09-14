@@ -168,6 +168,94 @@ describe.sequential('automatic screenshot service lifecycle', () => {
     expectNextCaptureToUseGate(service)
   })
 
+  it('runs a manual refresh as a full frame while OCR is in backoff', async () => {
+    const service = createRunningIdleService()
+    service.fullOcrCooldownUntil = Date.now() + 60000
+    service.pendingFullCapture = false
+    service.candidateStreak = 0
+    service.manualHiddenAugmentIds = ['1', '2', '3']
+    service.manualHiddenAugmentUntil = Date.now() + 60000
+    mocks.captureScreenshot.mockResolvedValue({
+      success: true,
+      buffer: Buffer.from('manual-frame'),
+      width: 1024,
+      height: 576,
+    })
+    const queueAnalysis = vi.spyOn(service, '_queueAnalysis').mockImplementation(() => {})
+
+    expect(service.triggerManualRefresh('test-hotkey')).toBe(true)
+    await vi.waitFor(() => expect(mocks.captureScreenshot).toHaveBeenCalledOnce())
+
+    expect(mocks.captureScreenshot).toHaveBeenCalledWith(expect.objectContaining({
+      thumbnailSize: { width: 1024, height: 576 },
+    }))
+    expect(queueAnalysis).toHaveBeenCalledWith(Buffer.from('manual-frame'))
+    expect(service.captureMode).toBe('active-selection')
+    expect(service.manualHiddenAugmentIds).toEqual([])
+    expect(service.manualHiddenAugmentUntil).toBe(0)
+    expect(service.forceAugmentNotificationOnce).toBe(true)
+  })
+
+  it('queues a manual refresh requested while OCR is busy', async () => {
+    const service = createRunningIdleService()
+    service.isAnalyzing = true
+    const queueAnalysis = vi.spyOn(service, '_queueAnalysis').mockImplementation(() => {})
+    mocks.captureScreenshot.mockResolvedValue({
+      success: true,
+      buffer: Buffer.from('queued-manual-frame'),
+      width: 1024,
+      height: 576,
+    })
+
+    expect(service.triggerManualRefresh('busy-hotkey')).toBe(true)
+    expect(service.manualRefreshQueued).toBe(true)
+    expect(mocks.captureScreenshot).not.toHaveBeenCalled()
+
+    service.isAnalyzing = false
+    await service._drainManualRefreshQueue()
+    await vi.waitFor(() => expect(mocks.captureScreenshot).toHaveBeenCalledOnce())
+    expect(queueAnalysis).toHaveBeenCalledWith(Buffer.from('queued-manual-frame'))
+  })
+
+  it('re-notifies the same three augments after a manual refresh', async () => {
+    const service = createRunningIdleService()
+    service.lastDetectedAugmentIds = ['1', '2', '3']
+    service.lastDetectedAugments = [
+      { id: 1, name: '一', detectedSlot: 0 },
+      { id: 2, name: '二', detectedSlot: 1 },
+      { id: 3, name: '三', detectedSlot: 2 },
+    ]
+    service.lastDetectedAugmentAt = Date.now()
+    service.forceAugmentNotificationOnce = true
+    const notify = vi.spyOn(service, '_notifyAugmentDetected').mockResolvedValue(undefined)
+    mocks.analyzeScreenshot.mockResolvedValue({
+      success: true,
+      timestamp: Date.now(),
+      analysis: {
+        cardCount: 3,
+        confidence: 0.99,
+        isAugmentPhase: true,
+        augments: [
+          { id: 1, name: '一', detectedSlot: 0 },
+          { id: 2, name: '二', detectedSlot: 1 },
+          { id: 3, name: '三', detectedSlot: 2 },
+        ],
+        slotDiagnostics: [],
+        augmentGate: {
+          ocrSkippedReason: null,
+          titleActivity: { likely: true },
+          rerollButtons: { visible: true },
+        },
+      },
+    })
+
+    await service._analyzeScreenshot(Buffer.from('same-augments-frame'))
+
+    expect(notify).toHaveBeenCalledOnce()
+    expect(service.forceAugmentNotificationOnce).toBe(false)
+    expect(service.lastDetectedAugmentIds).toEqual(['1', '2', '3'])
+  })
+
   it('returns to gate backoff when full OCR reports failure', async () => {
     const service = createRunningIdleService()
     const startedAt = Date.now()

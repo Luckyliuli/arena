@@ -252,6 +252,10 @@ class AutoScreenshotService {
         this.manualHiddenAugmentIds = []
         this.manualHiddenAugmentUntil = 0
         this.lastManualHiddenSuppressLogAt = 0
+        this.manualRefreshQueued = false
+        this.manualRefreshReason = ''
+        this.isManualRefreshRunning = false
+        this.forceAugmentNotificationOnce = false
     }
 
     /**
@@ -310,6 +314,10 @@ class AutoScreenshotService {
         this.manualHiddenAugmentIds = []
         this.manualHiddenAugmentUntil = 0
         this.lastManualHiddenSuppressLogAt = 0
+        this.manualRefreshQueued = false
+        this.manualRefreshReason = ''
+        this.isManualRefreshRunning = false
+        this.forceAugmentNotificationOnce = false
         this.startedAt = Date.now()
         this.firstCaptureLogged = false
         this.firstDetectionLogged = false
@@ -356,6 +364,10 @@ class AutoScreenshotService {
         this.captureMode = 'idle'
         this.isCapturing = false
         this.isAnalyzing = false
+        this.manualRefreshQueued = false
+        this.manualRefreshReason = ''
+        this.isManualRefreshRunning = false
+        this.forceAugmentNotificationOnce = false
 
         const runDurationMs = this.startedAt ? Date.now() - this.startedAt : 0
         logger.info(`Auto screenshot service stopped by ${owner}. screenshots=${this.screenshotCount}, analyses=${this.analysisCount}, detections=${this.detectionCount}, replacedPendingAnalyses=${this.droppedAnalysisCount}, backpressureSkippedCaptures=${this.analysisBackpressureSkipCount}, duration=${runDurationMs}ms`)
@@ -378,6 +390,105 @@ class AutoScreenshotService {
                 this.clearAugmentState(`gameflow-${phase}`)
             }
         }
+    }
+
+    /**
+     * 手动触发一轮全尺寸截图和 OCR，绕过门禁与完整 OCR 冷却。
+     */
+    triggerManualRefresh(reason = 'manual-refresh') {
+        if (!this.isRunning || !this.enableAnalysis || !this.isAnalysisAllowedByGameflow()) {
+            logger.debug('Manual augment refresh ignored', {
+                reason,
+                isRunning: this.isRunning,
+                enableAnalysis: this.enableAnalysis,
+                gameflowPhase: this.gameflowPhase,
+            })
+            return false
+        }
+
+        this.manualRefreshQueued = true
+        this.manualRefreshReason = reason || 'manual-refresh'
+        logger.info('Manual augment refresh requested', {
+            reason: this.manualRefreshReason,
+            isCapturing: this.isCapturing,
+            isAnalyzing: this.isAnalyzing,
+            captureMode: this.captureMode,
+        })
+
+        if (!this.isCapturing && !this.isAnalyzing) {
+            void this._drainManualRefreshQueue()
+        }
+        return true
+    }
+
+    async _drainManualRefreshQueue() {
+        if (this.isManualRefreshRunning || !this.manualRefreshQueued) {
+            return
+        }
+        if (!this.isRunning || !this.enableAnalysis || !this.isAnalysisAllowedByGameflow()) {
+            this.manualRefreshQueued = false
+            this.manualRefreshReason = ''
+            return
+        }
+        if (this.isCapturing || this.isAnalyzing) {
+            return
+        }
+
+        this.isManualRefreshRunning = true
+        try {
+            while (
+                this.manualRefreshQueued &&
+                this.isRunning &&
+                this.enableAnalysis &&
+                this.isAnalysisAllowedByGameflow() &&
+                !this.isCapturing &&
+                !this.isAnalyzing
+            ) {
+                this.manualRefreshQueued = false
+                await this._performManualRefresh(this.manualRefreshReason || 'manual-refresh')
+            }
+        } finally {
+            this.isManualRefreshRunning = false
+        }
+    }
+
+    async _performManualRefresh(reason) {
+        const runId = this.runId
+        if (this.intervalId) {
+            clearTimeout(this.intervalId)
+            this.intervalId = null
+        }
+
+        this.manualHiddenAugmentIds = []
+        this.manualHiddenAugmentUntil = 0
+        this.lastDetectedArenaItemIds = []
+        this.lastDetectedArenaItemAt = 0
+        this.arenaItemMissCount = 0
+        this.visibleAugmentMissCount = 0
+        this.fullOcrCooldownUntil = 0
+        this.pendingFullCapture = false
+        this.candidateStreak = 0
+        this._setCaptureMode('active-selection', `manual-refresh:${reason}`)
+        this.forceAugmentNotificationOnce = true
+
+        logger.info('Manual augment refresh capturing full frame', {
+            reason,
+            runId,
+            captureMode: this.captureMode,
+            thumbnailSize: this._getCurrentThumbnailSize(),
+        })
+
+        const cycleStart = performance.now()
+        const result = await this._captureScreenshot(runId)
+        if (!this.isRunning || runId !== this.runId) {
+            return result
+        }
+
+        if (!result?.success && this.forceAugmentNotificationOnce) {
+            this.forceAugmentNotificationOnce = false
+        }
+        this._scheduleNextCaptureAfterCycle(cycleStart, runId)
+        return result
     }
 
     isAnalysisAllowedByGameflow() {
@@ -436,19 +547,27 @@ class AutoScreenshotService {
 
             await this._captureScreenshot(runId)
 
-            const elapsed = performance.now() - cycleStart
-            const activeInterval = this._getCurrentCaptureInterval()
-            const nextDelay = this.controlOwner === 'gameflow'
-                ? resolveGameflowNextCaptureDelay({
-                    mode: this.captureMode,
-                    pendingFullCapture: this.pendingFullCapture,
-                    fullOcrCooldownUntil: this.fullOcrCooldownUntil,
-                    intervalMs: activeInterval,
-                    elapsedMs: elapsed,
-                })
-                : Math.max(0, activeInterval - elapsed)
-            this._scheduleNextCapture(nextDelay, runId)
+            this._scheduleNextCaptureAfterCycle(cycleStart, runId)
         }, delayMs)
+    }
+
+    _scheduleNextCaptureAfterCycle(cycleStart, runId = this.runId) {
+        if (!this.isRunning || runId !== this.runId) {
+            return
+        }
+
+        const elapsed = performance.now() - cycleStart
+        const activeInterval = this._getCurrentCaptureInterval()
+        const nextDelay = this.controlOwner === 'gameflow'
+            ? resolveGameflowNextCaptureDelay({
+                mode: this.captureMode,
+                pendingFullCapture: this.pendingFullCapture,
+                fullOcrCooldownUntil: this.fullOcrCooldownUntil,
+                intervalMs: activeInterval,
+                elapsedMs: elapsed,
+            })
+            : Math.max(0, activeInterval - elapsed)
+        this._scheduleNextCapture(nextDelay, runId)
     }
 
     _getCurrentCaptureInterval() {
@@ -739,7 +858,13 @@ class AutoScreenshotService {
             if (runId === this.runId) {
                 this.isAnalyzing = false
 
-                if (this.pendingAnalysisBuffer && this.isRunning && this.enableAnalysis) {
+                if (this.manualRefreshQueued && this.isRunning && this.enableAnalysis) {
+                    if (this.pendingAnalysisBuffer) {
+                        this.pendingAnalysisBuffer = null
+                        this.droppedAnalysisCount++
+                    }
+                    void this._drainManualRefreshQueue()
+                } else if (this.pendingAnalysisBuffer && this.isRunning && this.enableAnalysis) {
                     const latestBuffer = this.pendingAnalysisBuffer
                     this.pendingAnalysisBuffer = null
                     void this._drainAnalysisQueue(latestBuffer, runId)
@@ -754,6 +879,8 @@ class AutoScreenshotService {
      */
     async _analyzeScreenshot(imageBuffer) {
         try {
+            const forceAugmentNotification = this.forceAugmentNotificationOnce
+            this.forceAugmentNotificationOnce = false
             this.analysisCount++
             const analysisStart = performance.now()
             const analysisResult = await analyzeScreenshot(imageBuffer)
@@ -817,16 +944,17 @@ class AutoScreenshotService {
                 const currentIdList = currentIds.join(',')
                 const lastIds = this.lastDetectedAugmentIds.join(',')
                 const changedSlots = getChangedSlots(currentIds, this.lastDetectedAugmentIds)
+                const changed = currentIdList !== lastIds || forceAugmentNotification
                 this._logFullDetectionDiagnostics({
                     analysisResult,
                     augments: normalizedAugments,
                     currentIds,
                     changedSlots,
                     analysisDuration,
-                    changed: currentIdList !== lastIds,
+                    changed,
                 })
 
-                if (currentIdList !== lastIds) {
+                if (changed) {
                     // 新的海克斯组合，更新显示
                     this.detectionCount++
                     this.lastDetectedAugmentIds = currentIds
@@ -2044,6 +2172,10 @@ class AutoScreenshotService {
         this.manualHiddenAugmentIds = []
         this.manualHiddenAugmentUntil = 0
         this.lastManualHiddenSuppressLogAt = 0
+        this.manualRefreshQueued = false
+        this.manualRefreshReason = ''
+        this.isManualRefreshRunning = false
+        this.forceAugmentNotificationOnce = false
         this.lastDetectedAugmentAt = 0
         this.visibleAugmentMissCount = 0
         this.arenaItemSource = null

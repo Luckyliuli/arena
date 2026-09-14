@@ -1319,7 +1319,31 @@ function ensureQuitCleanup(reason = 'app quit') {
     return quitCleanupPromise
 }
 
+let manualAugmentRefreshShortcutRegistered = false
+
+function registerManualAugmentRefreshShortcut() {
+    if (manualAugmentRefreshShortcutRegistered) {
+        return
+    }
+
+    try {
+        const registered = globalShortcut.register('F8', () => {
+            void autoScreenshotService.triggerManualRefresh('hotkey-F8')
+        })
+        if (!registered) {
+            logger.warn('Failed to register manual augment refresh shortcut', { accelerator: 'F8' })
+            return
+        }
+
+        manualAugmentRefreshShortcutRegistered = true
+        logger.info('Manual augment refresh shortcut registered', { accelerator: 'F8' })
+    } catch (error) {
+        logger.warn('Failed to register manual augment refresh shortcut:', error.message)
+    }
+}
+
 function registerAppEvents() {
+    registerManualAugmentRefreshShortcut()
     let appUpdateInstallOnQuitPromise = null
 
     app.on('before-quit', (event) => {
