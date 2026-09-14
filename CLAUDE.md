@@ -5,7 +5,7 @@
 ## 工作语言
 
 - 对话、注释和项目记录默认使用简体中文。
-- 正式文档放 `docs/`；讨论稿、方案草案和评审材料放 `discuss/`。
+- 正式文档放 `docs/`；讨论稿、方案草案和评审材料放 `.scratch/`（本地、不提交）。
 
 ## 当前架构事实
 
@@ -98,6 +98,7 @@ node tests/electron/test-augment-ocr-fixtures.js
 
 ## 文档指针
 
+- 文档总索引：`docs/README.md`
 - 架构总览：`COMPLETE_ARCHITECTURE.md`
 - Electron 迁移和安全状态：`docs/ELECTRON_VITE_MIGRATION_PROGRESS.md`
 - ARAM LCU 只读推荐：`docs/ARAM_LCU_READONLY_RECOMMENDATION_PROGRESS.md`

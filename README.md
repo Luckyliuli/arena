@@ -66,7 +66,7 @@
 1. 从 [Releases](https://github.com/valkia/aramgg_client/releases/latest) 下载最新的 `aramgg_client Setup <version>.exe`。
 2. 安装并启动 ARAMGG 助手，再启动 League Client。应用会优先从运行中的客户端自动发现 LCU。
 3. 进入极地大乱斗：选人阶段查看英雄详情与席位建议；进入对局后等待海克斯界面出现。
-4. 自动识别失败时可按 `F1` 手动截图分析。
+4. 自动识别失败时可按 `F8` 强制刷新海克斯识别，无需等待自动截图冷却。
 
 「游戏目录」不是必填项。只有进程优先的 LCU 自动发现失败时，才需要把它作为读取 lockfile / 日志的高级兜底。
 
@@ -109,6 +109,7 @@ npm run build
 
 ## 文档导航
 
+- [项目文档索引](./docs/README.md)
 - [完整架构](./COMPLETE_ARCHITECTURE.md)
 - [自动海克斯检测使用指南](./docs/USER_GUIDE_AUTO_AUGMENT.md)
 - [客户端反馈与日志边界](./docs/FEEDBACK.md)

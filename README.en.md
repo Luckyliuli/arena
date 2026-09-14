@@ -65,7 +65,7 @@
 1. Download the latest `aramgg_client Setup <version>.exe` from [Releases](https://github.com/valkia/aramgg_client/releases/latest).
 2. Install and launch ARAMGG Assistant, then launch League Client. The app discovers LCU from the running client first.
 3. Enter ARAM: use the champion detail window during champion select, then wait for an Augment selection screen in-game.
-4. If automatic recognition misses, press `F1` to capture and analyze manually.
+4. If automatic recognition misses, press `F8` to force a full-size augment refresh without waiting for the automatic capture cooldown.
 
 The game-directory setting is not required for normal use. It is an advanced fallback for reading the LCU lockfile and logs only when process-first discovery fails.
 
@@ -108,6 +108,7 @@ The app uses Electron, Vue 3, electron-vite, TypeScript, and PaddleOCR. Process-
 
 ## Documentation
 
+- [Documentation index](./docs/README.md)
 - [Complete architecture](./COMPLETE_ARCHITECTURE.md)
 - [Automatic Augment detection guide](./docs/USER_GUIDE_AUTO_AUGMENT.md)
 - [LCU troubleshooting](./docs/LCU_TROUBLESHOOTING.md)
