@@ -10,4 +10,9 @@ describe('getAugmentIconUrl', () => {
   it('keeps absolute URLs unchanged', () => {
     expect(getAugmentIconUrl('https://example.com/icon.png')).toBe('https://example.com/icon.png')
   })
+
+  it('rewrites OP.GG augment icons to the public icon mirror that serves the desktop client', () => {
+    expect(getAugmentIconUrl('https://opgg-static.akamaized.net/meta/images/lol/latest/augment/criticalrhythm_large.png'))
+      .toBe('https://cdn.dtodo.cn/hextech/augment-icons/criticalrhythm_large.png')
+  })
 })

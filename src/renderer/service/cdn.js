@@ -56,6 +56,13 @@ export function getAugmentIconUrl(iconPath) {
     return '';
   }
 
+  const opggIconMatch = String(iconPath).match(
+    /^https?:\/\/opgg-static\.akamaized\.net\/meta\/images\/lol\/latest\/augment\/([^/?#]+)$/i
+  );
+  if (opggIconMatch) {
+    return `https://cdn.dtodo.cn/hextech/augment-icons/${opggIconMatch[1]}`;
+  }
+
   if (/^https?:\/\//i.test(iconPath)) {
     return iconPath;
   }
