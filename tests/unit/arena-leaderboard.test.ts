@@ -12,6 +12,8 @@ import { nextTick } from 'vue'
 
 // Mock the native electron bridge before importing the component.
 const mockGetStats = vi.fn()
+const mockGetChampions = vi.fn()
+const mockStoreGet = vi.fn()
 let mockElectronApi: any = null
 
 vi.mock('../../src/renderer/native/electron-api.ts', () => ({
@@ -53,18 +55,33 @@ const i18n = createI18n({
         rarityUnknown: '未知',
         loadFailed: '加载失败',
         apiUnavailable: '前端 IPC 不可用',
+        selectChampion: '选择英雄',
       },
     },
   },
 })
 
 beforeEach(() => {
-  mockElectronApi = { arenaAugmentData: { getStats: mockGetStats } }
+  mockGetChampions.mockResolvedValue({
+    success: true,
+    patch: 'test',
+    champions: [
+      { id: 1, slug: 'Annie', nameZh: '黑暗之女', nameEn: 'Annie' },
+      { id: 2, slug: 'Olaf', nameZh: '狂战士', nameEn: 'Olaf' },
+    ],
+  })
+  mockStoreGet.mockResolvedValue(undefined)
+  mockElectronApi = {
+    arenaAugmentData: { getStats: mockGetStats, getChampions: mockGetChampions },
+    store: { get: mockStoreGet },
+  }
 })
 
 afterEach(() => {
   mockElectronApi = null
   mockGetStats.mockReset()
+  mockGetChampions.mockReset()
+  mockStoreGet.mockReset()
 })
 
 function factory() {
@@ -179,6 +196,32 @@ describe('ArenaLeaderboard', () => {
     // would render a column of dashes.
     const labels = w.findAll('.rank-tabs button').map((b) => b.text())
     expect(labels).toEqual(['\u6309\u9009\u7528\u7387', 'OP.GG \u80dc\u7387'])
+    w.unmount()
+  })
+
+  it('lets the leaderboard switch to another champion', async () => {
+    mockGetStats.mockResolvedValue({
+      success: true,
+      bundle: {
+        fetchedAt: new Date().toISOString(),
+        source: 'opgg',
+        mock: false,
+        records: [],
+      },
+      ranked: { placement: [], firstplace: [], picks: [], winrate: [] },
+      sourceLabel: 'OP.GG',
+    })
+    const w = factory()
+    await flushPromises()
+
+    expect(mockGetStats).toHaveBeenLastCalledWith({ championId: 1, limit: 20 })
+    expect(w.text()).toContain('黑暗之女')
+
+    await w.get('select[aria-label="选择英雄"]').setValue('2')
+    await flushPromises()
+
+    expect(mockGetStats).toHaveBeenLastCalledWith({ championId: 2, limit: 20 })
+    expect(w.text()).toContain('狂战士')
     w.unmount()
   })
 })

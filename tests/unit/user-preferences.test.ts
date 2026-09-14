@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ get: vi.fn() }))
+const mocks = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn() }))
 
 vi.mock('../../src/main/modules/app-store.ts', () => ({
-  default: { get: mocks.get },
+  default: { get: mocks.get, set: mocks.set },
 }))
 
 import {
+  migrateLegacyChampionInsightAlwaysOnTopPreference,
   shouldHideChampionInsightOnGameStart,
   shouldKeepChampionInsightOnTop,
   shouldShowChampionDetails,
@@ -15,6 +16,7 @@ import {
 describe('user preferences', () => {
   beforeEach(() => {
     mocks.get.mockReset()
+    mocks.set.mockReset()
   })
 
   it('defaults Champion Details visibility to enabled', () => {
@@ -45,5 +47,30 @@ describe('user preferences', () => {
     expect(shouldKeepChampionInsightOnTop()).toBe(true)
     mocks.get.mockReturnValue(false)
     expect(shouldKeepChampionInsightOnTop()).toBe(false)
+  })
+
+  it('migrates the legacy always-on-top default once so the details window is visible above League', () => {
+    mocks.get.mockImplementation((key: string) => {
+      if (key === 'migrations.championInsightAlwaysOnTopDefaultV1') return undefined
+      if (key === 'championInsight.alwaysOnTop') return false
+      return undefined
+    })
+
+    migrateLegacyChampionInsightAlwaysOnTopPreference()
+
+    expect(mocks.set).toHaveBeenCalledWith('championInsight.alwaysOnTop', true)
+    expect(mocks.set).toHaveBeenCalledWith('migrations.championInsightAlwaysOnTopDefaultV1', true)
+  })
+
+  it('does not override a pin choice made after the migration', () => {
+    mocks.get.mockImplementation((key: string) => {
+      if (key === 'migrations.championInsightAlwaysOnTopDefaultV1') return true
+      if (key === 'championInsight.alwaysOnTop') return false
+      return undefined
+    })
+
+    migrateLegacyChampionInsightAlwaysOnTopPreference()
+
+    expect(mocks.set).not.toHaveBeenCalled()
   })
 })

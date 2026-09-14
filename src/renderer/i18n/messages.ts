@@ -16,6 +16,7 @@ export const messages = {
     },
     arenaLeaderboard: {
       title: '强化符文榜单',
+      selectChampion: '选择英雄',
       mockWarning: '当前数据为占位 (mock) 随机生成，仅供界面验证',
       source: '数据源',
       rankPlacement: '按平均名次',
@@ -411,6 +412,7 @@ export const messages = {
     },
     arenaLeaderboard: {
       title: 'Augment Leaderboard',
+      selectChampion: 'Champion',
       mockWarning: 'Mock data is currently shown — values are randomized placeholders, not real stats.',
       source: 'Source',
       rankPlacement: 'Avg placement',
@@ -479,6 +481,7 @@ export const messages = {
     },
     arenaLeaderboard: {
       title: '強化符文榜單',
+      selectChampion: '選擇英雄',
       mockWarning: '當前資料為佔位 (mock) 隨機生成，僅供介面驗證',
       source: '資料來源',
       rankPlacement: '按平均名次',

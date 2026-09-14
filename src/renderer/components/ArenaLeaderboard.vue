@@ -3,6 +3,19 @@
     <header class="card-header">
       <BarChart3 class="card-icon" />
       <h3>{{ t('arenaLeaderboard.title') }}</h3>
+      <label class="champion-picker">
+        <span class="sr-only">{{ t('arenaLeaderboard.selectChampion') }}</span>
+        <select
+          v-model.number="championId"
+          :aria-label="t('arenaLeaderboard.selectChampion')"
+          :disabled="loading || championOptions.length === 0"
+          @change="reload"
+        >
+          <option v-for="option in championOptions" :key="option.id" :value="option.id">
+            {{ championLabel(option) }}
+          </option>
+        </select>
+      </label>
       <div class="card-actions">
         <button class="reload-btn" type="button" :disabled="loading" :title="t('common.refresh')" @click="reload">
           <RefreshCw :class="{ spinning: loading }" />
@@ -75,6 +88,7 @@ import { electronAPI, hasElectronAPI } from '../native/electron-api.ts'
 import { getAugmentIconUrl } from '../service/cdn'
 import { useI18n } from 'vue-i18n'
 import type {
+  ArenaChampionOption,
   ArenaAugmentLeaderboardRow,
   ArenaAugmentRankOrder,
   ArenaAugmentRarity,
@@ -83,7 +97,7 @@ import type {
   ArenaAugmentStatsResult,
 } from '../../shared/ipc-contract.ts'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const DEFAULT_CHAMPION_ID = 1
 const DEFAULT_LIMIT = 20
 
@@ -119,6 +133,7 @@ const ranked = ref<Record<ArenaAugmentRankOrder, ArenaAugmentLeaderboardRow[]>>(
   winrate: [],
 })
 const sourceLabel = ref<string>('')
+const championOptions = ref<ArenaChampionOption[]>([])
 const loading = ref<boolean>(false)
 const error = ref<string | null>(null)
 const championId = ref<number>(DEFAULT_CHAMPION_ID)
@@ -126,6 +141,8 @@ const currentRank = ref<ArenaAugmentRankOrder>('picks')
 
 const rows = computed<ArenaAugmentLeaderboardRow[]>(() => ranked.value[currentRank.value] || [])
 const currentRankLabel = computed<string>(() => t(RANK_TITLE_KEYS[currentRank.value]))
+const championLabel = (option: ArenaChampionOption) =>
+  locale.value === 'en-US' ? option.nameEn : option.nameZh
 
 // When the source returns nothing it also tells us why. Surface that
 // instead of a generic "no data" — 'page-shape-changed' in particular
@@ -185,7 +202,31 @@ async function reload(): Promise<void> {
   }
 }
 
-onMounted(() => { void reload(); });
+async function initialize(): Promise<void> {
+  if (!hasElectronAPI()) {
+    error.value = t('arenaLeaderboard.apiUnavailable')
+    return
+  }
+
+  try {
+    const result = await electronAPI.arenaAugmentData.getChampions()
+    if (result.success && result.champions?.length) {
+      championOptions.value = result.champions
+      const savedChampionId = Number(await electronAPI.store.get('lastSelectedChampionId'))
+      if (championOptions.value.some(option => option.id === savedChampionId)) {
+        championId.value = savedChampionId
+      } else {
+        championId.value = championOptions.value[0].id
+      }
+    }
+  } catch {
+    // The stats request below still surfaces its own error if the bridge is down.
+  }
+
+  await reload()
+}
+
+onMounted(() => { void initialize(); });
 </script>
 
 <style scoped>
@@ -208,6 +249,31 @@ onMounted(() => { void reload(); });
     flex: 1;
     font-size: 15px;
     font-weight: 600;
+}
+.champion-picker { min-width: 112px; max-width: 150px; }
+.champion-picker select {
+    width: 100%;
+    height: 28px;
+    padding: 0 26px 0 8px;
+    border: 1px solid var(--hex-border, #2c3140);
+    border-radius: 4px;
+    background: var(--hex-bg, #171a22);
+    color: var(--hex-fg, #e6e8ee);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+.champion-picker select:disabled { opacity: .55; cursor: wait; }
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 .card-icon { color: var(--hex-accent, #5e8ad4); width: 18px; height: 18px; }
 .card-actions .reload-btn {

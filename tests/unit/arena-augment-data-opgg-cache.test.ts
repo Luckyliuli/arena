@@ -106,14 +106,29 @@ describe('fileOpggCache', () => {
 
   it('returns null for a corrupt entry instead of throwing', async () => {
     const c = fileOpggCache(dir)
-    await fsp.writeFile(path.join(dir, 'champion-7.json'), '{ not json', 'utf8')
+    await fsp.writeFile(path.join(dir, 'champion-v2-7.json'), '{ not json', 'utf8')
+    expect(await c.get(7)).toBeNull()
+  })
+
+  it('ignores legacy augment cache files that lack display metadata', async () => {
+    const c = fileOpggCache(dir)
+    await fsp.writeFile(
+      path.join(dir, 'champion-7.json'),
+      JSON.stringify({
+        fetchedAt: new Date().toISOString(),
+        source: 'opgg',
+        mock: false,
+        records: goodRecords,
+      }),
+      'utf8',
+    )
     expect(await c.get(7)).toBeNull()
   })
 
   it('treats an entry older than the TTL as a miss', async () => {
     const c = fileOpggCache(dir, { ttlMs: 1000 })
     await fsp.writeFile(
-      path.join(dir, 'champion-7.json'),
+      path.join(dir, 'champion-v2-7.json'),
       JSON.stringify({ fetchedAt: new Date(Date.now() - 60_000).toISOString(), source: 'opgg', mock: false, records: goodRecords }),
       'utf8',
     )

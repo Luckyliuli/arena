@@ -34,6 +34,11 @@ export interface FileOpggCacheOptions {
 
 const DEFAULT_TTL_MS = 12 * 60 * 60 * 1000
 
+// v2 records carry display metadata and icon URLs. Keeping a distinct
+// filename makes every pre-v2 entry a clean miss, so users do not keep
+// seeing nameless / icon-less augments until the old TTL expires.
+const CACHE_SCHEMA_VERSION = 'v2'
+
 /**
  * On-disk cache. One JSON file per champion under `dir`.
  * All operations are best-effort: errors are swallowed and reported as
@@ -42,7 +47,7 @@ const DEFAULT_TTL_MS = 12 * 60 * 60 * 1000
 export function fileOpggCache(dir: string, opts: FileOpggCacheOptions = {}): OpggCache {
   const ttlMs = opts.ttlMs ?? DEFAULT_TTL_MS
 
-  const fileFor = (championId: number) => path.join(dir, `champion-${championId}.json`)
+  const fileFor = (championId: number) => path.join(dir, `champion-${CACHE_SCHEMA_VERSION}-${championId}.json`)
 
   return {
     async get(championId) {

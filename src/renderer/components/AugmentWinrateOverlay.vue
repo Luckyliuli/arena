@@ -161,10 +161,11 @@
                     @blur="hideAugmentTooltip"
                   >
                     <img
-                      v-if="augment.iconPath"
-                      :src="getAugmentIconUrl(augment.iconPath)"
+                      v-if="augment.iconPath || augment.iconUrl"
+                      :src="getAugmentIconUrl(augment.iconPath || augment.iconUrl)"
                       :alt="augment.name"
                       class="augment-icon"
+                      @error="handleImageError"
                     />
                     <span v-else>{{ index + 1 }}</span>
                   </div>

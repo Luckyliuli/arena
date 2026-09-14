@@ -1034,6 +1034,24 @@ export function registerIpcHandlers(_isDev: boolean): void {
         }
     })
 
+    ipcMain.handle('arena-augment:get-champions', async () => {
+        try {
+            const { loadArenaChampionMap } = await import('../../shared/champion-map.ts')
+            const map = loadArenaChampionMap()
+            return {
+                success: true,
+                patch: map.patch,
+                champions: map.champions,
+            }
+        } catch (error) {
+            logger.error('[arena-augment] champion options failed:', error)
+            return {
+                success: false,
+                error: getErrorMessage(error),
+            }
+        }
+    })
+
     ipcMain.handle('arena-item:get-stats', async (_event, request) => {
         const startedAt = Date.now()
         const championId = Number(request?.championId)

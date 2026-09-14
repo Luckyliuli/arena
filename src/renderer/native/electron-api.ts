@@ -1,6 +1,7 @@
 import type {
   ArenaAugmentStatsRequest,
   ArenaAugmentStatsResult,
+  ArenaChampionOptionsResult,
   ArenaItemStatsRequest,
   ArenaItemStatsResult,
   ElectronAPI,
@@ -100,6 +101,8 @@ export const electronAPI: ElectronAPI = {
   arenaAugmentData: {
     getStats: (...args: [ArenaAugmentStatsRequest]): Promise<ArenaAugmentStatsResult> =>
       requireElectronAPI().arenaAugmentData.getStats(...args),
+    getChampions: (): Promise<ArenaChampionOptionsResult> =>
+      requireElectronAPI().arenaAugmentData.getChampions(),
   },
   arenaItemData: {
     getStats: (...args: [ArenaItemStatsRequest]): Promise<ArenaItemStatsResult> =>

@@ -8,6 +8,8 @@ export const USER_PREFERENCE_KEYS = {
     showAugmentSidePanel: 'augments.showSidePanel',
 }
 
+const LEGACY_ALWAYS_ON_TOP_MIGRATION_KEY = 'migrations.championInsightAlwaysOnTopDefaultV1'
+
 export function getBooleanPreference(key: string, defaultValue = true): boolean {
     const value = store.get(key)
     if (value == null) {
@@ -35,4 +37,21 @@ export function shouldShowAugmentTopOverlay(): boolean {
 
 export function shouldShowAugmentSidePanel(): boolean {
     return getBooleanPreference(USER_PREFERENCE_KEYS.showAugmentSidePanel, true)
+}
+
+/**
+ * Older builds shipped `championInsight.alwaysOnTop = false`. That made the
+ * Champion Details window open underneath the League client, which looked
+ * like it never opened at all. Flip that legacy value once; later explicit
+ * choices are preserved by the migration marker.
+ */
+export function migrateLegacyChampionInsightAlwaysOnTopPreference(): void {
+    if (store.get(LEGACY_ALWAYS_ON_TOP_MIGRATION_KEY)) {
+        return
+    }
+
+    if (store.get(USER_PREFERENCE_KEYS.championInsightAlwaysOnTop) === false) {
+        store.set(USER_PREFERENCE_KEYS.championInsightAlwaysOnTop, true)
+    }
+    store.set(LEGACY_ALWAYS_ON_TOP_MIGRATION_KEY, true)
 }

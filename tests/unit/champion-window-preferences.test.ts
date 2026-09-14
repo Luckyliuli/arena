@@ -55,10 +55,10 @@ beforeEach(() => {
 })
 
 async function setup() {
-  const manager = await import('../../src/main/modules/window-manager.ts')
-  const popup = await manager.createPopupWindow(true, 'http://localhost:5173')
   const { registerPreferencesIpcHandlers } = await import('../../src/main/ipc/preferences-handlers.ts')
   registerPreferencesIpcHandlers()
+  const manager = await import('../../src/main/modules/window-manager.ts')
+  const popup = await manager.createPopupWindow(true, 'http://localhost:5173')
   return { manager, popup }
 }
 
@@ -91,6 +91,7 @@ describe('champion window preferences', () => {
   })
 
   it.each([false, true])('keeps game visibility separate from pinning (%s)', async pinned => {
+    mocks.store.set('migrations.championInsightAlwaysOnTopDefaultV1', true)
     mocks.store.set('championInsight.hideOnGameStart', false)
     mocks.store.set('championInsight.alwaysOnTop', pinned)
     const { manager, popup } = await setup()

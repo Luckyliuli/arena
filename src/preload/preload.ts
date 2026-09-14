@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   ArenaAugmentStatsRequest,
   ArenaAugmentStatsResult,
+  ArenaChampionOptionsResult,
   ArenaItemStatsRequest,
   ArenaItemStatsResult,
   ElectronAPI,
@@ -147,6 +148,8 @@ const electronAPI: ElectronAPI = {
   arenaAugmentData: {
     getStats: (request: ArenaAugmentStatsRequest): Promise<ArenaAugmentStatsResult> =>
       ipcRenderer.invoke('arena-augment:get-stats', request),
+    getChampions: (): Promise<ArenaChampionOptionsResult> =>
+      ipcRenderer.invoke('arena-augment:get-champions'),
   },
   arenaItemData: {
     getStats: (request: ArenaItemStatsRequest): Promise<ArenaItemStatsResult> =>

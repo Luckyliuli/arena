@@ -375,6 +375,18 @@ export interface ArenaAugmentStatsResult extends OperationResult {
   sourceLabel?: string
 }
 
+export interface ArenaChampionOption {
+  id: number
+  slug: string
+  nameEn: string
+  nameZh: string
+}
+
+export interface ArenaChampionOptionsResult extends OperationResult {
+  patch?: string
+  champions?: ArenaChampionOption[]
+}
+
 export type ArenaItemCategory = 'prismatic' | 'core' | 'boots' | 'starting' | 'final'
 
 export type ArenaItemRef = {
@@ -512,6 +524,7 @@ export interface ElectronAPI {
   }
   arenaAugmentData: {
     getStats(request: ArenaAugmentStatsRequest): Promise<ArenaAugmentStatsResult>
+    getChampions(): Promise<ArenaChampionOptionsResult>
   }
   arenaItemData: {
     getStats(request: ArenaItemStatsRequest): Promise<ArenaItemStatsResult>
