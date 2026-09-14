@@ -92,3 +92,43 @@ export function onlineOpggHtmlFetcher(opts: OnlineOpggFetcherOptions = {}): Aren
     })
   }
 }
+
+
+export function offlineOpggItemsHtmlFetcher(rootDir: string): ArenaAugmentHtmlFetcher {
+  return offlineOpggHtmlFetcher(rootDir)
+}
+
+export function onlineOpggItemsHtmlFetcher(opts: OnlineOpggFetcherOptions = {}): ArenaAugmentHtmlFetcher {
+  const locale = opts.locale ?? 'zh-cn'
+  const userAgent = opts.userAgent ?? DEFAULT_UA
+  const timeoutMs = opts.timeoutMs ?? 20000
+  return async (championSlug: string) => {
+    const url = `https://op.gg/${locale}/lol/modes/arena/${championSlug}/items`
+    return new Promise<string>((resolve, reject) => {
+      const req = https.get(
+        url,
+        {
+          headers: {
+            'User-Agent': userAgent,
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+            Accept: 'text/html,application/xhtml+xml',
+            'Accept-Encoding': 'identity',
+          },
+          signal: opts.signal,
+        },
+        (res) => {
+          if (res.statusCode !== 200) {
+            res.resume()
+            reject(new Error('OP.GG HTTP ' + res.statusCode + ' for ' + url))
+            return
+          }
+          const chunks: Buffer[] = []
+          res.on('data', (c) => chunks.push(c))
+          res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+        }
+      )
+      req.on('error', reject)
+      req.setTimeout(timeoutMs, () => req.destroy(new Error('OP.GG request timed out after ' + timeoutMs + 'ms')))
+    })
+  }
+}

@@ -30,17 +30,6 @@
 
       <!-- 主内容区 -->
       <div v-else-if="contentVisible" class="overlay-content">
-        <transition name="item-set-toast">
-          <div
-            v-if="itemSetToast.message"
-            class="item-set-toast"
-            :class="itemSetToast.type"
-          >
-            <PackageCheck v-if="itemSetToast.type === 'success'" class="item-set-toast-icon" />
-            {{ itemSetToast.message }}
-          </div>
-        </transition>
-
         <div class="insight-scroll">
           <section v-if="!isSidePanel" class="bench-inline">
           </section>
@@ -203,227 +192,7 @@
 
             <!-- 出装 Tab -->
             <div v-if="activeTab === 'builds'" class="tab-panel">
-              <div class="section-title-row">
-                <h3>{{ t('augment.buildRoutes') }}</h3>
-                <span>{{ buildRoutes.length ? t('augment.routeCount', { count: buildRoutes.length }) : '' }}</span>
-              </div>
-
-              <div v-if="hasBuildRecommendations" class="build-content">
-                <div v-if="buildRoutes.length > 1" class="build-route-tabs">
-                  <button
-                    v-for="(route, idx) in buildRoutes"
-                    :key="`${route.key}-tab`"
-                    type="button"
-                    class="build-route-tab"
-                    :class="{ active: selectedBuildRoute?.key === route.key }"
-                    @click="selectBuildRoute(idx)"
-                  >
-                    <span>{{ route.title }}</span>
-                    <small>{{ formatPercent(route.winRate) }} · {{ t('augment.gameCount', { count: formatNumber(route.games) }) }}</small>
-                  </button>
-                </div>
-
-                <article
-                  v-if="selectedBuildRoute"
-                  :key="selectedBuildRoute.key"
-                  class="build-route"
-                >
-                  <header class="build-route-header">
-                    <div class="build-route-title">
-                      <h4>{{ selectedBuildRoute.title }}</h4>
-                      <small v-if="selectedBuildRoute.subtitle">{{ selectedBuildRoute.subtitle }}</small>
-                    </div>
-                    <div
-                      v-if="selectedBuildRoute.winRate || selectedBuildRoute.games"
-                      class="build-route-stats"
-                    >
-                      <strong>{{ formatPercent(selectedBuildRoute.winRate) }}</strong>
-                      <small>{{ t('augment.gameCount', { count: formatNumber(selectedBuildRoute.games) }) }}</small>
-                    </div>
-                  </header>
-
-                  <section
-                    v-if="selectedBuildRoute.summonerSpells.length > 0"
-                    class="item-section recommendation-section"
-                  >
-                    <h4 class="recommendation-title">
-                      <Sparkles class="recommendation-title-icon spell" />
-                      {{ t('augment.summonerSpells') }}
-                    </h4>
-                    <div class="recommendation-list">
-                      <div
-                        v-for="(recommendation, recommendationIndex) in selectedBuildRoute.summonerSpells.slice(0, 3)"
-                        :key="`${selectedBuildRoute.key}-spells-${recommendation.summonerSpellIds.join('-')}-${recommendationIndex}`"
-                        class="recommendation-row"
-                      >
-                        <div class="recommendation-main">
-                          <span class="recommendation-rank">
-                            {{ t('augment.recommendationRank', { index: recommendationIndex + 1 }) }}
-                          </span>
-                          <div class="spell-icons">
-                            <img
-                              v-for="spellId in recommendation.summonerSpellIds"
-                              :key="spellId"
-                              :src="getSpellIconUrl(spellId)"
-                              class="spell-icon"
-                              :alt="t('augment.summonerSpellFallback', { id: spellId })"
-                              :title="t('augment.summonerSpellFallback', { id: spellId })"
-                            />
-                          </div>
-                        </div>
-                        <div class="recommendation-stats">
-                          <span>{{ t('augment.pickRate') }} <strong>{{ formatPercent(recommendation.pickRate) }}</strong></span>
-                          <span>{{ t('augment.winRate') }} <strong>{{ formatPercent(recommendation.winRate) }}</strong></span>
-                          <span v-if="recommendation.games > 0">{{ t('augment.gameCount', { count: formatNumber(recommendation.games) }) }}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section
-                    v-if="selectedBuildRoute.skillOrders.length > 0"
-                    class="item-section recommendation-section"
-                  >
-                    <h4 class="recommendation-title">
-                      <ListOrdered class="recommendation-title-icon skill" />
-                      {{ t('augment.skillOrder') }}
-                    </h4>
-                    <div class="recommendation-list">
-                      <div
-                        v-for="(recommendation, recommendationIndex) in selectedBuildRoute.skillOrders.slice(0, 3)"
-                        :key="`${selectedBuildRoute.key}-skills-${recommendation.skillOrder.join('-')}-${recommendationIndex}`"
-                        class="recommendation-row skill-order-row"
-                      >
-                        <div class="skill-order-heading">
-                          <span class="recommendation-rank">
-                            {{ t('augment.recommendationRank', { index: recommendationIndex + 1 }) }}
-                          </span>
-                          <strong>{{ formatSkillPriority(recommendation.skillOrder) }}</strong>
-                        </div>
-                        <div class="skill-sequence">
-                          <span
-                            v-for="(skillNumber, levelIndex) in recommendation.skillOrder"
-                            :key="`${levelIndex}-${skillNumber}`"
-                            class="skill-step"
-                            :class="`skill-${getSkillKey(skillNumber).toLowerCase()}`"
-                            :title="t('augment.skillLevel', { level: levelIndex + 1, skill: getSkillKey(skillNumber) })"
-                          >
-                            <small>{{ levelIndex + 1 }}</small>
-                            <strong>{{ getSkillKey(skillNumber) }}</strong>
-                          </span>
-                        </div>
-                        <div class="recommendation-stats">
-                          <span>{{ t('augment.pickRate') }} <strong>{{ formatPercent(recommendation.pickRate) }}</strong></span>
-                          <span>{{ t('augment.winRate') }} <strong>{{ formatPercent(recommendation.winRate) }}</strong></span>
-                          <span v-if="recommendation.games > 0">{{ t('augment.gameCount', { count: formatNumber(recommendation.games) }) }}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section v-if="selectedBuildRoute.startingItems.length > 0" class="item-section starter-section">
-                    <h4>{{ t('augment.startingItems') }}</h4>
-                    <div class="starter-list">
-                      <div
-                        v-for="(build, idx) in selectedBuildRoute.startingItems.slice(0, 2)"
-                        :key="`${selectedBuildRoute.key}-starter-${idx}`"
-                        class="starter-row"
-                      >
-                        <div class="item-icons">
-                          <img
-                            v-for="itemId in build.items"
-                            :key="itemId"
-                            :src="getItemIconUrl(itemId)"
-                            class="item-icon small"
-                            :alt="getItemName(itemId)"
-                          />
-                        </div>
-                        <span>{{ formatPercent(build.winRate) }}</span>
-                      </div>
-                    </div>
-                  </section>
-
-                  <div v-if="selectedBuildRoute.coreItems.length > 0" class="build-grid">
-                    <div
-                      v-for="(build, idx) in selectedBuildRoute.coreItems.slice(0, 4)"
-                      :key="`${selectedBuildRoute.key}-core-${idx}`"
-                      class="build-tile"
-                    >
-                      <div class="build-tile-label">{{ t('augment.coreItem', { index: idx + 1 }) }}</div>
-                      <div class="item-icons">
-                        <img
-                          v-for="itemId in build.items.slice(0, 6)"
-                          :key="itemId"
-                          :src="getItemIconUrl(itemId)"
-                          class="item-icon"
-                          :alt="getItemName(itemId)"
-                        />
-                      </div>
-                      <div class="build-stats">
-                        <span>{{ formatPercent(build.winRate) }}</span>
-                        <small v-if="build.games > 0">{{ t('augment.gameCount', { count: formatNumber(build.games) }) }}</small>
-                        <small v-else-if="build.pickRate">{{ t('augment.pickRate') }} {{ formatPercent(build.pickRate) }}</small>
-                      </div>
-                    </div>
-                  </div>
-
-                  <section v-if="selectedBuildRoute.fullItems.length > 0" class="item-section">
-                    <h4>{{ t('augment.fullItems') }}</h4>
-                    <div class="build-grid">
-                      <div
-                        v-for="(build, idx) in selectedBuildRoute.fullItems.slice(0, 3)"
-                        :key="`${selectedBuildRoute.key}-full-${idx}`"
-                        class="build-tile"
-                      >
-                        <div class="build-tile-label">{{ t('augment.fullItem', { index: idx + 1 }) }}</div>
-                        <div class="item-icons">
-                          <img
-                            v-for="itemId in build.items.slice(0, 6)"
-                            :key="itemId"
-                            :src="getItemIconUrl(itemId)"
-                            class="item-icon"
-                            :alt="getItemName(itemId)"
-                          />
-                        </div>
-                        <div class="build-stats">
-                          <span>{{ formatPercent(build.winRate) }}</span>
-                          <small v-if="build.games > 0">{{ t('augment.gameCount', { count: formatNumber(build.games) }) }}</small>
-                          <small v-else-if="build.pickRate">{{ t('augment.pickRate') }} {{ formatPercent(build.pickRate) }}</small>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section v-if="selectedBuildRoute.itemExtensions.length > 0" class="item-section">
-                    <h4>{{ t('augment.laterItems') }}</h4>
-                    <div class="situational-grid">
-                      <img
-                        v-for="item in selectedBuildRoute.itemExtensions.slice(0, 12)"
-                        :key="`${selectedBuildRoute.key}-next-${item.itemId}`"
-                        :src="getItemIconUrl(item.itemId)"
-                        class="item-icon small"
-                        :alt="getItemName(item.itemId)"
-                      />
-                    </div>
-                  </section>
-
-                  <section v-if="selectedBuildRoute.situationalItems.length > 0" class="item-section">
-                    <h4>{{ t('augment.alternativeItems') }}</h4>
-                    <div class="situational-grid">
-                      <img
-                        v-for="item in selectedBuildRoute.situationalItems.slice(0, 12)"
-                        :key="`${selectedBuildRoute.key}-situational-${item.itemId}`"
-                        :src="getItemIconUrl(item.itemId)"
-                        class="item-icon small"
-                        :alt="getItemName(item.itemId)"
-                      />
-                    </div>
-                  </section>
-                </article>
-              </div>
-              <div v-else class="empty-state">
-                <p>{{ t('augment.noBuilds') }}</p>
-              </div>
+              <ArenaItemRecommendations :champion-id="Number(championId) || null" />
             </div>
           </div>
         </div>
@@ -432,18 +201,6 @@
             <small>{{ t('augment.source', { source: formatDataSource(dataSource) }) }}</small>
             <small v-if="timestamp">{{ t('augment.updatedAt', { time: formatTime(timestamp) }) }}</small>
           </div>
-        </div>
-
-        <div v-if="!isSidePanel && championId" class="item-set-actions">
-          <button
-            class="item-set-btn"
-            type="button"
-            :disabled="itemSetApplying || !hasBuildRecommendations"
-            @click="configureCurrentChampionItems(false)"
-          >
-            <PackagePlus class="item-set-icon" />
-            {{ itemSetButtonLabel }}
-          </button>
         </div>
 
         <div
@@ -478,22 +235,15 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { ExternalLink, ListOrdered, Minus, PackageCheck, PackagePlus, Sparkles, X } from 'lucide-vue-next'
+import { ExternalLink, Minus, X } from 'lucide-vue-next'
 import {
   getAugmentIconUrl,
   getChampionIconUrl,
   getChampionSquareIconUrl,
-  getItemIconUrl as getFallbackItemIconUrl,
-  getSpellIconUrl,
 } from '../service/cdn'
 import { electronAPI } from '../native/electron-api.ts'
 import { sortAugmentsByDetectedOrder } from '../service/augment-order.js'
 import { rankAugmentRecommendations } from '../../shared/augment-ranking.ts'
-import {
-  createBuildRoutes,
-  getSkillKey,
-  getSkillPriority,
-} from '../service/champion-build-routes.js'
 import {
   formatAugmentTier,
   formatAugmentWinRate,
@@ -501,11 +251,11 @@ import {
   formatNumber,
   formatPercent,
   formatTime,
-  getLocalizedText,
   getWinRateClass,
   handleImageError,
 } from '../service/overlay-formatters.ts'
 import { useAugmentTooltip } from '../composables/use-augment-tooltip.ts'
+import ArenaItemRecommendations from './ArenaItemRecommendations.vue'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
@@ -526,7 +276,6 @@ const championId = ref(null)
 const championName = ref('')
 const championNameData = ref(null)
 const activeTab = ref(DEFAULT_ACTIVE_TAB)
-const selectedBuildRouteIndex = ref(0)
 const selectedRarity = ref('all')
 const dataSource = ref('local')
 const timestamp = ref(null)
@@ -536,19 +285,11 @@ const champSelectMode = ref(false)
 const championStats = ref(null)
 const augmentBase = ref([])
 const augmentStats = ref({})
-const buildData = ref(null)
-const itemsData = ref({})
 const championLinks = ref({})
 const displayAugments = ref([])
 const benchPreviewRecommendation = ref(null)
 const unsubscribeEvents = []
-const itemSetApplying = ref(false)
-const itemSetAutoEnabled = ref(true)
-const itemSetToast = ref({ type: '', message: '' })
-const ITEM_SET_AUTO_KEY = 'itemSets.autoApplyAram'
 const CHAMPION_DATA_CACHE_TTL_MS = 15000
-const MAX_ITEM_SET_BUILDS = 4
-let itemSetToastTimer = null
 let championLoadSequence = 0
 let championDataRequest = null
 let championDataCache = null
@@ -557,25 +298,6 @@ const activeDataLocale = ref('zh-CN')
 
 const contentVisible = computed(() => champSelectMode.value || !!championId.value || !!championStats.value)
 const isSidePanel = computed(() => props.variant === 'side-panel')
-const itemSetButtonLabel = computed(() => {
-  if (itemSetApplying.value) {
-    return t('itemSets.configuring')
-  }
-
-  if (!hasBuildRecommendations.value) {
-    return t('itemSets.waitingForData')
-  }
-
-  const count = Math.min(buildRoutes.value.length, MAX_ITEM_SET_BUILDS)
-  const target = count > 1
-    ? t('itemSets.multipleSets', { count })
-    : t('itemSets.currentChampion')
-
-  return itemSetAutoEnabled.value
-    ? t('itemSets.reconfigure', { target })
-    : t('itemSets.configure', { target })
-})
-
 const championBlogUrl = computed(() => {
   return championBlogs.value[0]?.url || null
 })
@@ -624,21 +346,6 @@ const logOverlayInfo = (message, details = {}) => {
     })
   } catch (err) {
     console.warn('Failed to send overlay diagnostic log:', err)
-  }
-}
-
-const loadItemSetAutoPreference = async () => {
-  try {
-    const storedValue = await electronAPI.store.get(ITEM_SET_AUTO_KEY)
-    if (storedValue == null) {
-      await electronAPI.store.set(ITEM_SET_AUTO_KEY, true)
-      itemSetAutoEnabled.value = true
-      return
-    }
-
-    itemSetAutoEnabled.value = Boolean(storedValue)
-  } catch (err) {
-    console.warn('Failed to load item set preference:', err)
   }
 }
 
@@ -697,54 +404,6 @@ const loadChampionDataOnce = async (requestedChampionId, requestedLocale = activ
   }
 }
 
-const showItemSetToast = (type, message) => {
-  itemSetToast.value = { type, message }
-
-  if (itemSetToastTimer) {
-    clearTimeout(itemSetToastTimer)
-  }
-
-  itemSetToastTimer = setTimeout(() => {
-    itemSetToast.value = { type: '', message: '' }
-    itemSetToastTimer = null
-  }, 2600)
-}
-
-const formatItemSetSuccessMessage = (automatic, result = {}) => {
-  const count = Number(result?.writtenItemSetCount)
-  if (Number.isFinite(count) && count > 0) {
-    return automatic
-      ? t('itemSets.autoAppliedMultiple', { count })
-      : t('itemSets.appliedMultiple', { count })
-  }
-
-  return automatic ? t('itemSets.autoApplied') : t('itemSets.applied')
-}
-
-const configureCurrentChampionItems = async (automatic = false) => {
-  if (!championId.value || itemSetApplying.value || !hasBuildRecommendations.value) {
-    return
-  }
-
-  itemSetApplying.value = true
-  showItemSetToast('loading', automatic ? t('itemSets.autoConfiguring') : t('itemSets.configuringNow'))
-
-  try {
-    const result = await electronAPI.itemSets.installAramChampion({
-      championId: championId.value,
-    })
-    if (!result?.success) {
-      throw new Error(result?.error || t('itemSets.configurationFailed'))
-    }
-
-    showItemSetToast('success', formatItemSetSuccessMessage(automatic, result))
-  } catch (err) {
-    showItemSetToast('error', err?.message || t('itemSets.configurationFailed'))
-  } finally {
-    itemSetApplying.value = false
-  }
-}
-
 // Tabs 配置
 const tabs = computed(() => [
   { key: 'augments', label: t('augment.tabs.augments') },
@@ -786,7 +445,6 @@ const setActiveTab = (key) => {
 
 const resetOverlaySelection = () => {
   activeTab.value = DEFAULT_ACTIVE_TAB
-  selectedBuildRouteIndex.value = 0
   selectedRarity.value = 'all'
   hideAugmentTooltip()
 }
@@ -878,8 +536,6 @@ const applyFallbackChampionData = (data) => {
   }
   augmentBase.value = []
   augmentStats.value = {}
-  buildData.value = null
-  itemsData.value = {}
   championLinks.value = data?.championLinks || {
     relatedBlogs: data?.relatedBlogs || [],
   }
@@ -896,72 +552,6 @@ const filteredAugments = computed(() => {
   }
   return displayAugments.value.filter(a => a.rarity === selectedRarity.value)
 })
-
-const buildRoutes = computed(() => createBuildRoutes(buildData.value))
-
-const hasBuildRecommendations = computed(() => buildRoutes.value.length > 0)
-
-const selectedBuildRoute = computed(() => {
-  if (!buildRoutes.value.length) {
-    return null
-  }
-
-  const index = Math.min(
-    Math.max(Number(selectedBuildRouteIndex.value) || 0, 0),
-    buildRoutes.value.length - 1,
-  )
-
-  return buildRoutes.value[index] || buildRoutes.value[0] || null
-})
-
-const selectBuildRoute = (index) => {
-  selectedBuildRouteIndex.value = index
-  hideAugmentTooltip()
-}
-
-const formatSkillPriority = (skillOrder) => {
-  const [primary = 'Q', secondary = 'W', tertiary = 'E'] = getSkillPriority(skillOrder)
-  return t('augment.skillPriority', { primary, secondary, tertiary })
-}
-
-const itemNameById = computed(() => {
-  const records = Array.isArray(itemsData.value)
-    ? itemsData.value
-    : Object.values(itemsData.value || {})
-  const map = new Map()
-
-  records.forEach(item => {
-    const id = String(item?.id ?? item?.itemId ?? '')
-    if (!id) {
-      return
-    }
-
-    const name = getLocalizedText(item.name)
-    map.set(id, name || t('augment.itemFallback', { id }))
-  })
-
-  return map
-})
-
-const itemIconById = computed(() => {
-  const records = Array.isArray(itemsData.value)
-    ? itemsData.value
-    : Object.values(itemsData.value || {})
-  const map = new Map()
-
-  records.forEach(item => {
-    const id = String(item?.id ?? item?.itemId ?? '')
-    const iconUrl = item?.iconUrl || item?.iconPath || item?.image?.full || ''
-    if (id && /^https?:\/\//i.test(String(iconUrl))) {
-      map.set(id, iconUrl)
-    }
-  })
-
-  return map
-})
-
-const getItemName = (itemId) => itemNameById.value.get(String(itemId)) || t('augment.itemFallback', { id: itemId })
-const getItemIconUrl = (itemId) => itemIconById.value.get(String(itemId)) || getFallbackItemIconUrl(itemId)
 
 /**
  * 显示浮窗
@@ -990,8 +580,6 @@ const showOverlay = async (data) => {
   championDataLoading.value = false
   error.value = null
   championStats.value = null
-  buildData.value = null
-  itemsData.value = {}
   championLinks.value = {}
   displayAugments.value = []
   if (shouldResetSelection) {
@@ -1001,7 +589,6 @@ const showOverlay = async (data) => {
   }
   benchPreviewRecommendation.value = data?.benchRecommendation || null
   championNameData.value = null
-  itemSetToast.value = { type: '', message: '' }
   champSelectMode.value =
     data?.champSelect === true ||
     data?.dataSource === 'champ-select' ||
@@ -1055,11 +642,6 @@ const showOverlay = async (data) => {
     championNameData.value = null
     dataSource.value = data.dataSource || 'local'
     timestamp.value = data.timestamp || Date.now()
-    await loadItemSetAutoPreference()
-    if (itemSetAutoEnabled.value) {
-      showItemSetToast('loading', t('itemSets.autoEnabledWaiting'))
-    }
-
     // 加载完整英雄数据
     const requestedChampionId = Number(championId.value)
     logOverlayInfo('loadChampionData requested', {
@@ -1097,17 +679,13 @@ const showOverlay = async (data) => {
         stats,
         augments,
         augmentStats: augStats,
-        builds,
-        items,
         championName: nameData,
         championLinks: linksData,
       } = result.data
       championStats.value = stats
       augmentBase.value = augments
       augmentStats.value = augStats
-      buildData.value = { builds: Array.isArray(builds) ? builds : [] }
-      itemsData.value = items
-      championNameData.value = nameData || null
+              championNameData.value = nameData || null
       championLinks.value = linksData || {}
 
       // 设置英雄名称（优先使用传入的，否则使用从数据加载的）
@@ -1120,8 +698,6 @@ const showOverlay = async (data) => {
         source: championDataSource,
         durationMs: Date.now() - championLoadStartedAt,
         augmentCount: augStats ? Object.keys(augStats).length : 0,
-        hasBuilds: Array.isArray(builds) && builds.length > 0,
-        buildCount: Array.isArray(builds) ? builds.length : 0,
       })
 
       const championAugmentRows = mapChampionAugmentRows(augments, augStats)
@@ -1220,11 +796,8 @@ const closeOverlay = (reason = 'manual') => {
   benchPreviewRecommendation.value = null
   augmentBase.value = []
   augmentStats.value = {}
-  buildData.value = null
-  itemsData.value = {}
   championLinks.value = {}
   displayAugments.value = []
-  selectedBuildRouteIndex.value = 0
   hideAugmentTooltip()
 
   if (isSidePanel.value) {
@@ -1348,28 +921,11 @@ onMounted(() => {
     logOverlayInfo('game-in-progress received; champion insight visibility handled by main process')
   }))
 
-  unsubscribeEvents.push(electronAPI.events.on('item-set-auto-apply-completed', (data) => {
-    const eventChampionId = Number(data?.championId)
-    if (!eventChampionId || Number(championId.value) !== eventChampionId) {
-      return
-    }
-
-    if (data?.success) {
-      showItemSetToast('success', formatItemSetSuccessMessage(true, data))
-      return
-    }
-
-    showItemSetToast('error', data?.error || t('itemSets.configurationFailed'))
-  }))
 })
 
 onBeforeUnmount(() => {
   championLoadSequence += 1
   unsubscribeEvents.splice(0).forEach(unsubscribe => unsubscribe())
-  if (itemSetToastTimer) {
-    clearTimeout(itemSetToastTimer)
-    itemSetToastTimer = null
-  }
 })
 
 // 暴露方法供外部调用

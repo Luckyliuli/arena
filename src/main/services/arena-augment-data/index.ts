@@ -4,6 +4,24 @@
 // reorganized without ripple.
 
 export {
+  ARENA_ITEM_CATEGORIES,
+  emptyArenaItemCategories,
+  type ArenaItemCategory,
+  type ArenaItemCategories,
+  type ArenaItemPerfStat,
+  type ArenaItemRef,
+  type ArenaItemStatsBundle,
+} from './itemTypes.ts'
+
+export {
+  fileOpggItemCache,
+  memoryOpggItemCache,
+  opggItemSource,
+  type OpggItemCache,
+  type OpggItemSourceOptions,
+} from './opgg/itemsSource.ts'
+
+export {
   type ArenaAugmentSource,
   type AugmentPerfStat,
   type AugmentStatsBundle,

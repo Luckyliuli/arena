@@ -351,6 +351,40 @@ export interface ArenaAugmentStatsResult extends OperationResult {
   sourceLabel?: string
 }
 
+export type ArenaItemCategory = 'prismatic' | 'core' | 'boots' | 'starting' | 'final'
+
+export type ArenaItemRef = {
+  itemId: number
+  name: string
+  iconUrl: string | null
+}
+
+export type ArenaItemPerfStat = {
+  items: ArenaItemRef[]
+  averagePlacement: number | null
+  firstPlaceRate: number | null
+  pickRate: number | null
+  winRate: number | null
+  sampleSize: number | null
+}
+
+export type ArenaItemStatsBundle = {
+  fetchedAt: string
+  source: 'opgg'
+  mock: false
+  categories: Record<ArenaItemCategory, ArenaItemPerfStat[]>
+  reason?: string | null
+}
+
+export interface ArenaItemStatsRequest {
+  championId: number
+}
+
+export interface ArenaItemStatsResult extends OperationResult {
+  bundle?: ArenaItemStatsBundle
+  sourceLabel?: string
+}
+
 export interface ElectronEventMap {
   fromMain: [payload?: unknown]
   'for-popup': [payload: OverlayPayload]
@@ -451,6 +485,9 @@ export interface ElectronAPI {
   }
   arenaAugmentData: {
     getStats(request: ArenaAugmentStatsRequest): Promise<ArenaAugmentStatsResult>
+  }
+  arenaItemData: {
+    getStats(request: ArenaItemStatsRequest): Promise<ArenaItemStatsResult>
   }
   events: {
     on<K extends ElectronEventChannel>(

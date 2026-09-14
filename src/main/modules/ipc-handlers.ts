@@ -963,6 +963,45 @@ export function registerIpcHandlers(_isDev: boolean): void {
         }
     })
 
+    ipcMain.handle('arena-item:get-stats', async (_event, request) => {
+        const startedAt = Date.now()
+        const championId = Number(request?.championId)
+        if (!Number.isFinite(championId) || championId <= 0) {
+            return { success: false, error: 'championId is required' }
+        }
+
+        try {
+            const { opggItemSource, fileOpggItemCache } = await import('../services/arena-augment-data/index.ts')
+            const { getArenaAugmentCacheDir } = await import('./app-paths.ts')
+            const source = opggItemSource({
+                cache: fileOpggItemCache(getArenaAugmentCacheDir()),
+            })
+            const bundle = await source.getItemsForChampion(championId)
+            const recordCount = Object.values(bundle.categories).reduce((count, rows) => count + rows.length, 0)
+
+            if (bundle.reason) {
+                const level = bundle.reason === 'page-shape-changed' ? 'warn' : 'info'
+                logger[level]('[arena-item] source returned no records', {
+                    championId,
+                    source: source.id,
+                    reason: bundle.reason,
+                })
+            } else {
+                logger.info('[arena-item] stats served', {
+                    championId,
+                    source: source.id,
+                    recordCount,
+                    durationMs: getElapsedMs(startedAt),
+                })
+            }
+
+            return { success: true, bundle, sourceLabel: source.label }
+        } catch (error) {
+            logger.error('[arena-item] stats failed:', error)
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
     ipcMain.on('log-renderer-info', (_event, data = {}) => {
         logger.debug('Renderer info reported:', {
             type: data.type || 'renderer-info',
