@@ -29,7 +29,6 @@ import {
     tryNormalizeDataLocale,
 } from './data-loader.ts'
 import { loadArenaOcrLocaleData } from './services/arena-augment-data/ocr-dictionary.ts'
-import { parseArenaAugmentLevel } from './services/arena-augment-data/augment-level.ts'
 import logger from './modules/logger.ts'
 import { ensureOnnxruntimeNativeDllPath } from './modules/onnxruntime-native-path.ts'
 import { discoverLcuAuthFromProcess } from './services/lcu/process-auth-discovery.ts'
@@ -643,7 +642,7 @@ async function resetPaddleOcrService() {
     }
 }
 
-async function performPaddleOCR(imageBuffer, options = undefined) {
+async function performPaddleOCR(imageBuffer) {
     return await enqueueOcr(async () => {
         const service = await getPaddleOcrService()
         if (!service) {
@@ -662,7 +661,7 @@ async function performPaddleOCR(imageBuffer, options = undefined) {
             }
             : await decodeImageToRaw(imageBuffer)
 
-        return await service.recognize(input, options)
+        return await service.recognize(input)
     })
 }
 
@@ -1139,19 +1138,6 @@ function createPaddleOcrTitleRegions(width, height) {
     }))
 }
 
-function createPaddleOcrLevelRegions(width, height) {
-    const { cardWidth, cardGap, groupLeft } = createCardLayout(width, height)
-
-    return [0, 1, 2].map(index => ({
-        name: `paddleocr-card-level-${index + 1}`,
-        left: groupLeft + index * (cardWidth + cardGap) + cardWidth * 0.28,
-        top: height * 0.43,
-        width: cardWidth * 0.44,
-        height: height * 0.055,
-        scale: 10,
-    }))
-}
-
 function createAugmentRerollButtonRegions(width, height) {
     const { cardWidth, cardGap, groupLeft } = createCardLayout(width, height)
 
@@ -1392,16 +1378,6 @@ async function preparePaddleOcrStackedTitleRegion(imageBuffer, imageWidth, image
     return await composeStackedTitleRows(preparedRows, 24)
 }
 
-async function preparePaddleOcrStackedLevelRegion(imageBuffer, imageWidth, imageHeight) {
-    const preparedRows = await Promise.all(
-        createPaddleOcrLevelRegions(imageWidth, imageHeight)
-            .map(region => prepareRawOcrRegion(imageBuffer, region, imageWidth, imageHeight))
-    )
-
-    return await composeStackedTitleRows(preparedRows, 20)
-
-}
-
 function getPaddleOcrItemCenterY(item) {
     const box = item?.box
     if (Array.isArray(box)) {
@@ -1432,7 +1408,7 @@ function extractPaddleOcrSlotTexts(items = [], rowBounds = []) {
         .trim())
 }
 
-async function buildOrderedTitleAugmentResult(slotTexts, rowFingerprints, groupRegion, engine, slotLevels = []) {
+async function buildOrderedTitleAugmentResult(slotTexts, rowFingerprints, groupRegion, engine) {
     const augments = []
     const seenIds = new Set()
     const slotDiagnostics = []
@@ -1440,10 +1416,8 @@ async function buildOrderedTitleAugmentResult(slotTexts, rowFingerprints, groupR
     for (const [index] of (groupRegion.regions || []).entries()) {
         const rawText = slotTexts[index]?.trim() || ''
         const titleFingerprint = rowFingerprints[index] || null
-        const levelText = slotLevels[index]?.trim() || ''
-        const augmentLevel = parseArenaAugmentLevel(levelText)
         if (rawText === '') {
-            slotDiagnostics.push({ slot: index, text: '', matchedId: null, titleFingerprint, levelText, augmentLevel, ocrEngine: engine })
+            slotDiagnostics.push({ slot: index, text: '', matchedId: null, titleFingerprint, ocrEngine: engine })
             logger.debug(`  ${engine} ordered title ${index + 1}: empty`)
             continue
         }
@@ -1462,8 +1436,6 @@ async function buildOrderedTitleAugmentResult(slotTexts, rowFingerprints, groupR
                 rejectedMatchedId: match?.id ?? null,
                 rejectReason: match ? 'non-title-text' : null,
                 titleFingerprint,
-                levelText,
-                augmentLevel,
                 ocrEngine: engine,
             })
             logger.debug(`  ${engine} ordered title ${index + 1}: no augment match`)
@@ -1476,24 +1448,17 @@ async function buildOrderedTitleAugmentResult(slotTexts, rowFingerprints, groupR
             matchedId: match.id,
             matchedName: match.name,
             titleFingerprint,
-            levelText,
-            augmentLevel,
             ocrEngine: engine,
         })
         seenIds.add(String(match.id))
+        const displayName = String(match.name || match.matchName || '')
         augments.push({
             ...match,
             detectedSlot: index,
-            augmentLevel,
-            isUpgrade: augmentLevel != null && augmentLevel > 1,
+            isUpgrade: /升级[:：]|升階[:：]/.test(displayName),
             ocrEngine: engine,
         })
         logger.debug(`  ${engine} ordered title ${index + 1}: ${match.name} (${match.id})`)
-    }
-
-    const groupUpgradeMode = augments.some(augment => augment.isUpgrade === true)
-    if (groupUpgradeMode) {
-        augments.forEach(augment => { augment.isUpgrade = true })
     }
 
     return {
@@ -1516,22 +1481,13 @@ export function isLikelyTitleSlotText(rawText, match) {
 async function readPaddleOcrTitleAugments(imageBuffer, groupRegion, imageWidth, imageHeight) {
     const startedAt = performance.now()
     const prepareStartedAt = performance.now()
-    const [prepared, preparedLevels] = await Promise.all([
-        preparePaddleOcrStackedTitleRegion(imageBuffer, imageWidth, imageHeight),
-        preparePaddleOcrStackedLevelRegion(imageBuffer, imageWidth, imageHeight),
-    ])
+    const prepared = await preparePaddleOcrStackedTitleRegion(imageBuffer, imageWidth, imageHeight)
     const { rect, rowBounds, rowFingerprints } = prepared
     const prepareMs = performance.now() - prepareStartedAt
     logger.debug(`PaddleOCR ordered title stack: x=${rect.left}, y=${rect.top}, width=${rect.width}, height=${rect.height}`)
 
     const ocrStartedAt = performance.now()
-    const [items, levelItems] = await Promise.all([
-        performPaddleOCR(prepared),
-        performPaddleOCR(preparedLevels, { detection: { textPixelThreshold: 0.05, minimumAreaThreshold: 1 }, charWhiteList: ['0','1','2','3','4','5','6','7','8','9','L','l','v','V','.','级','級'] }).catch(error => {
-            logger.warn('PaddleOCR level stack unavailable', { error: error.message })
-            return null
-        }),
-    ])
+    const items = await performPaddleOCR(prepared)
     const ocrMs = performance.now() - ocrStartedAt
     if (!items) {
         return null
@@ -1539,11 +1495,10 @@ async function readPaddleOcrTitleAugments(imageBuffer, groupRegion, imageWidth, 
 
     const extractStartedAt = performance.now()
     const slotTexts = extractPaddleOcrSlotTexts(items, rowBounds)
-    const slotLevels = levelItems ? extractPaddleOcrSlotTexts(levelItems, preparedLevels.rowBounds) : []
     const extractMs = performance.now() - extractStartedAt
 
     const matchStartedAt = performance.now()
-    const result = await buildOrderedTitleAugmentResult(slotTexts, rowFingerprints, groupRegion, 'paddleocr', slotLevels)
+    const result = await buildOrderedTitleAugmentResult(slotTexts, rowFingerprints, groupRegion, 'paddleocr')
     const matchMs = performance.now() - matchStartedAt
     const totalMs = performance.now() - startedAt
 
@@ -1554,10 +1509,8 @@ async function readPaddleOcrTitleAugments(imageBuffer, groupRegion, imageWidth, 
         extractMs: Number(extractMs.toFixed(1)),
         matchMs: Number(matchMs.toFixed(1)),
         itemCount: Array.isArray(items) ? items.length : 0,
-        levelItemCount: Array.isArray(levelItems) ? levelItems.length : 0,
         matchedCount: result.augments.length,
         slotTexts: slotTexts.map(text => text.slice(0, 80)),
-        slotLevels: slotLevels.map(text => text.slice(0, 20)),
     }
 
     if (totalMs > 220) {
