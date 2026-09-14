@@ -56,6 +56,8 @@ import {
     GAMEFLOW_CAPTURE_THUMBNAIL_SIZE,
     GAMEFLOW_IDLE_CAPTURE_INTERVAL_MS,
 } from '../auto-screenshot-policy.ts'
+import { readArenaSessionState } from '../services/arena-session/arena-session-service.ts'
+import { shoppingPhaseSignalStore } from '../services/arena-session/shopping-phase-signal.ts'
 
 const __dirname = import.meta.dirname
 
@@ -99,6 +101,11 @@ const AUGMENT_CLEAR_PHASES = new Set([
     'EndOfGame',
 ])
 let autoScreenshotManagedByGameFlow = false
+// Arena verdict for the current InProgress episode. A null value means
+// undecided;
+// once resolvable it is memoized so the 1s heartbeat does not re-read the LCU
+// every tick. Reset whenever the phase leaves InProgress.
+let inProgressArenaVerdict = null
 let lastGameWindowStatusKey = null
 let lastGameWindowStatusLogAt = 0
 let lastGameApiDiagnosticAt = 0
@@ -228,6 +235,67 @@ async function startAutoScreenshotForGame(reason) {
     }
 
     return success
+}
+
+/**
+ * Whether the current InProgress match is Arena (斗魂竞技场). Results are
+ * memoized for the episode; an unresolved queue stays open so the next
+ * heartbeat can retry instead of locking in a wrong "not Arena" verdict.
+ */
+async function resolveInProgressArenaVerdict(lcuService, reason) {
+    if (inProgressArenaVerdict !== null) {
+        return inProgressArenaVerdict
+    }
+
+    try {
+        const session = await readArenaSessionState({
+            lcu: lcuService,
+            getRememberedChampionId: () => getChampionMonitorState().lastChampionId,
+        })
+
+        if (session.isArena === null) {
+            logger.debug('Arena verdict undecided; retrying on next heartbeat', {
+                reason,
+                queueId: session.queueId,
+                gameMode: session.gameMode,
+            })
+            return null
+        }
+
+        inProgressArenaVerdict = session.isArena === true
+        logger.info(inProgressArenaVerdict
+            ? 'In-progress match identified as Arena; auto screenshot allowed'
+            : 'In-progress match is not Arena; auto screenshot skipped', {
+            reason,
+            queueId: session.queueId,
+            gameMode: session.gameMode,
+            queueEvidence: session.queueEvidence,
+        })
+        return inProgressArenaVerdict
+    } catch (error) {
+        logger.warn('Arena verdict lookup failed; skipping auto screenshot this tick', {
+            reason,
+            error: error?.message || String(error),
+        })
+        return false
+    }
+}
+
+/**
+ * Start the gameflow-driven auto screenshot service only for Arena matches.
+ * Other modes never enter the augment OCR chain, so they cannot mis-recognize.
+ */
+async function startArenaAutoScreenshotForGame(lcuService, reason) {
+    if (autoScreenshotService.isRunning) {
+        return false
+    }
+
+    const verdict = await resolveInProgressArenaVerdict(lcuService, reason)
+    if (verdict !== true) {
+        return false
+    }
+
+    return startAutoScreenshotForGame(reason)
 }
 
 function stopAutoScreenshotForGame(reason) {
@@ -792,14 +860,19 @@ function logLolGameStatus(status, phase) {
     }
 }
 
-async function reconcileAutoScreenshotWithLolWindow(phase) {
+async function reconcileAutoScreenshotWithLolWindow(phase, lcuService) {
     const status = await getLolGameStatus()
     logLolGameStatus(status, phase)
 
     if (status.isGameOpen) {
-        await startAutoScreenshotForGame(
-            `LoL game process/window fallback while LCU phase is ${phase || 'unknown'} (${status.name})`
-        )
+        if (lcuService) {
+            await startArenaAutoScreenshotForGame(
+                lcuService,
+                `LoL game process/window fallback while LCU phase is ${phase || 'unknown'} (${status.name})`
+            )
+        } else {
+            logger.warn('Skipping game-window auto screenshot: LCU service unavailable for Arena verdict')
+        }
         return
     }
 
@@ -905,6 +978,11 @@ async function initGameFlowMonitor() {
                 return
             }
 
+            if (phase !== GAMEFLOW_AUGMENT_ANALYSIS_PHASE) {
+                inProgressArenaVerdict = null
+                shoppingPhaseSignalStore.reset()
+            }
+
             autoScreenshotService.setGameflowPhase(phase)
             setAppUpdateGamePhase(phase)
             setChampionMonitorPhase(phase)
@@ -942,7 +1020,7 @@ async function initGameFlowMonitor() {
                         notifyAllWindows('game-in-progress', {})
                         resetChampSelectItemSetState('LCU phase InProgress')
                         void recoverChampionInsightForInProgress(lcuService, 'LCU phase InProgress')
-                        await startAutoScreenshotForGame('LCU phase InProgress')
+                        await startArenaAutoScreenshotForGame(lcuService, 'LCU phase InProgress')
                         break
                     case 'ENTER_WAITING_FOR_STATS':
                         logger.info('游戏已结束')
@@ -971,9 +1049,9 @@ async function initGameFlowMonitor() {
                 if (lastInProgressInsightChampionId == null) {
                     void recoverChampionInsightForInProgress(lcuService, 'LCU phase InProgress heartbeat')
                 }
-                await startAutoScreenshotForGame('LCU phase InProgress')
+                await startArenaAutoScreenshotForGame(lcuService, 'LCU phase InProgress')
             } else if (phase === 'None') {
-                await reconcileAutoScreenshotWithLolWindow(phase)
+                await reconcileAutoScreenshotWithLolWindow(phase, lcuService)
             } else if (phase) {
                 stopAutoScreenshotForGame(`LCU phase ${phase}`)
             }

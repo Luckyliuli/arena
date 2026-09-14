@@ -5,6 +5,7 @@
 This is an Electron + Vue app built with `electron-vite`. Source code lives under `src/`:
 
 - `src/main/`: Electron main process, window management, IPC handlers, data loading, screenshots, OCR, and LCU services.
+- `src/main/services/arena-session/`: Arena (斗魂竞技场) session detection. `arena-session-state.ts` stays pure and unit-testable; `arena-session-service.ts` wires the injected LCU reader. See `docs/GAMEFLOW_DETECTION_GUIDE.md`.
 - `src/preload/`: sandboxed preload bridge exposing `window.electronAPI`.
 - `src/renderer/`: Vue renderer app, routes, services, shared utilities, UI components, styles, and assets.
 - `src/shared/`: contracts shared across the main, preload, and renderer type boundaries.
@@ -76,6 +77,10 @@ Renderer-initiated IPC registrations must use `src/main/security/trusted-ipc.ts`
 Manifest logical paths and resource URLs must go through `src/shared/client-data-security.ts`; do not join remote path strings directly to writable directories. Additional data origins must be explicit HTTPS origins, except localhost HTTP used for development.
 
 Remote config may propose an updater feed but must never extend the built-in feed-origin or Windows publisher trust roots. Keep automatic updates disabled until the production origin, Authenticode publisher CN, and signed installer have been verified together.
+
+Arena session detection must not guess the shopping phase from gameflow `InProgress`; return `shoppingPhase: 'unknowable'` until a visual/OCR gate provides `shoppingPhaseSignal`. Arena identity comes from queue id 1700 or gameMode `CHERRY`, and a known non-Arena session must not carry a champion.
+
+Arena augment stats default to the real OP.GG source, behind a read-through on-disk cache. ARENA_AUGMENT_SOURCE=mock|communitydragon is a dev/test override only: an unset or unrecognised value must never fall back to placeholder stats, because the popup would then present fabricated numbers as real.
 
 ARAM champ-select recommendation code must remain read-only. Do not connect `pickOrBan`, `benchSwap`, `action`, `acceptTrade`, or `declineTrade` to recommendation flows; keep executable LCU writes isolated to their existing feature areas such as rune pages.
 

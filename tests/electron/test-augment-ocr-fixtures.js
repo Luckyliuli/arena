@@ -144,7 +144,7 @@ async function main() {
     for (const sample of manifest) {
         const imagePath = path.join(fixturesDir, sample.file)
         await assertFixtureResult(analyzeScreenshot, imagePath, sample, '1280x720')
-        if (sample.expectedCardCount > 0) {
+        if (sample.expectTitleActivity === true) {
             const gateBuffer = await sharp(imagePath)
                 .resize(640, 360, { fit: 'fill' })
                 .png()

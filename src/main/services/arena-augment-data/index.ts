@@ -15,6 +15,16 @@ export {
   rankAugmentStats,
 } from './interface.ts'
 
+export {
+  type ArenaAugmentRecommendation,
+  type ArenaAugmentRecommendationSet,
+  type ArenaRecommendationCandidate,
+  type ArenaRecommendationTier,
+  calculateArenaRecommendScore,
+  getArenaRecommendationTier,
+  recommendArenaAugmentCandidates,
+} from './recommendation.ts'
+
 // Cache wiring. The IPC layer constructs a file-backed cache under the
 // app data dir and hands it to selectAugmentSource(); the adapter itself
 // stays free of Electron path knowledge.

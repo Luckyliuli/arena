@@ -26,7 +26,7 @@ describe('augment overlay performance safeguards', () => {
     expect(sidePanelOverlay).not.toContain('backdrop-filter')
   })
 
-  it('displays rank-backed recommendations while preserving client win rates', async () => {
+  it('renders the arena floating overlay from precomputed recommendation data', async () => {
     const [floatingOverlay, championDetailOverlay] = await Promise.all([
       readFile(
         new URL('../../src/renderer/components/AugmentFloatingOverlay.vue', import.meta.url),
@@ -38,10 +38,16 @@ describe('augment overlay performance safeguards', () => {
       ),
     ])
 
+    expect(floatingOverlay).toContain('orderArenaOverlayAugments(detectedAugments.value)')
+    expect(floatingOverlay).toContain('findArenaOverlayTopPickIndex(overlayAugments.value)')
+    expect(floatingOverlay).toContain('hasArenaOverlayMockData(overlayAugments.value, recommendationMock.value)')
+    expect(floatingOverlay).toContain("t('augment.placeholderData')")
+    expect(floatingOverlay).toContain("t('augment.pickRateShort')")
     expect(floatingOverlay).toContain('formatPercent(augment.pickRate)')
-    expect(floatingOverlay).toContain('formatAugmentWinRate(augment.winRate)')
-    expect(floatingOverlay).toContain("t('augment.winRate')")
-    expect(floatingOverlay).toContain('const hasRecommendationData =')
+    expect(floatingOverlay).not.toContain('formatAugmentWinRate')
+    expect(floatingOverlay).not.toContain("t('augment.winRate')")
+    expect(floatingOverlay).not.toContain('mergeWinrateWithDetectedSlots')
+    expect(floatingOverlay).not.toContain('electronAPI.winrate.get')
     expect(championDetailOverlay).toContain('formatAugmentWinRate(augment.winRate)')
     expect(championDetailOverlay).toContain("t('augment.winRate')")
     expect(championDetailOverlay).toContain('class="augment-tier"')

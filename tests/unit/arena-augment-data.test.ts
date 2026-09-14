@@ -22,7 +22,7 @@ function isStatFilled(stat: { averagePlacement: unknown, firstPlaceRate: unknown
 }
 
 describe('arena augment data adapter', () => {
-  it('returns the mock source by default; every record carries numeric stats', async () => {
+  it('selects the mock source when explicitly requested; every record carries numeric stats', async () => {
     process.env.ARENA_AUGMENT_SOURCE = 'mock'
     const src = selectAugmentSource()
     expect(src.id).toBe('mock')
@@ -31,6 +31,18 @@ describe('arena augment data adapter', () => {
     expect(bundle.records.length).toBeGreaterThan(0)
     expect(bundle.records.every(isStatFilled)).toBe(true)
     expect(typeof bundle.fetchedAt).toBe('string')
+  })
+
+  it('defaults to the real OP.GG source when no override is set', () => {
+    const previous = process.env.ARENA_AUGMENT_SOURCE
+    delete process.env.ARENA_AUGMENT_SOURCE
+    try {
+      // Constructing the source must not perform any network work.
+      expect(selectAugmentSource().id).toBe('opgg')
+    } finally {
+      if (previous === undefined) delete process.env.ARENA_AUGMENT_SOURCE
+      else process.env.ARENA_AUGMENT_SOURCE = previous
+    }
   })
 
   it('returns the communitydragon source when explicitly requested; stats are also numeric', async () => {

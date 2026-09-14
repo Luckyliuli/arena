@@ -350,4 +350,71 @@ describe('latest champion shard detail loading', () => {
       clearCache()
     }
   })
-})
+
+  it('fills a missing champion augment win rate from the global augment table', async () => {
+    const activeVersionDir = path.join(tempRoot, 'data', 'versions', '16.12.1')
+    const latestVersionDir = path.join(tempRoot, 'data', 'versions', '16.12.2')
+    await writeJson(path.join(activeVersionDir, 'augments.json'), {
+      augments: [
+        {
+          id: 1205,
+          name: 'Deft',
+          rarity: 'gold',
+          iconUrl: '/augment/deft.png',
+          stats: { tier: 2, games: 3200, wins: 1700, winRate: 0.548, pickRate: 0.21 },
+        },
+      ],
+    })
+    await writeJson(
+      path.join(latestVersionDir, 'champion-shards', '1.json'),
+      latestVladimirRankedWithoutAugmentWinRatesShard(),
+    )
+
+    const {
+      clearCache,
+      getChampionAugmentStats,
+      loadChampionAugments,
+    } = await import('../../src/main/data-loader.ts')
+
+    try {
+      const recommendations = await getChampionAugmentStats(8)
+      const stats = await loadChampionAugments(8)
+      const deft = recommendations.find((augment: any) => augment.augmentId === 1205)
+      const deftStats = stats['1205']
+
+      expect(deft.winRate).toBeCloseTo(0.548)
+      expect(deft.playCount).toBe(3200)
+      expect(deftStats.win_rate).toBeCloseTo(0.548)
+      expect(deftStats.num_games).toBe(3200)
+      expect(deft.pickRate).toBe(0.5)
+      expect(deft.rank).toBe(2)
+    } finally {
+      clearCache()
+    }
+  })
+
+  it('maps CommunityDragon augment ids to local ids through the shared dictionary', async () => {
+    const activeVersionDir = path.join(tempRoot, 'data', 'versions', '16.12.1')
+    await writeJson(path.join(activeVersionDir, 'augments.json'), {
+      augments: [
+        {
+          id: 1138,
+          key: 'ARAM_Goredrink',
+          name: 'Goredrink',
+          rarity: 'silver',
+          iconUrl: '/augment/goredrink.png',
+        },
+      ],
+    })
+
+    const { clearCache, resolveLocalAugmentIdAliases } = await import('../../src/main/data-loader.ts')
+
+    try {
+      const aliases = await resolveLocalAugmentIdAliases([138, 99999])
+
+      expect(aliases.get('138')).toBe('1138')
+      expect(aliases.has('99999')).toBe(false)
+    } finally {
+      clearCache()
+    }
+  })})

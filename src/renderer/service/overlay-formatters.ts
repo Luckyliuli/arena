@@ -60,10 +60,6 @@ export function formatPercent(value: unknown): string {
 }
 
 export function formatAugmentWinRate(value: unknown): string {
-  if (value == null || value === '') {
-    return translate('augment.insufficientGames')
-  }
-
   return formatPercent(value)
 }
 

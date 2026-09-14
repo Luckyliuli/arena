@@ -40,6 +40,9 @@ GET /lol-gameflow/v1/gameflow-phase
 - LCU 服务：`src/main/services/lcu/lcu-service.ts`
 - LCU WAMP WebSocket：`src/main/services/lcu/lcu-wamp-socket.ts`
 - LCU IPC：`src/main/services/lcu/ipc-handlers.ts`
+- 斗魂会话判定（纯逻辑，无 Electron/axios 依赖）：`src/main/services/arena-session/arena-session-state.ts`
+- 斗魂会话编排（读取 LCU 并交给纯逻辑，依赖注入可单测）：`src/main/services/arena-session/arena-session-service.ts`
+- 斗魂会话 IPC：`lcu-get-arena-session`（`src/main/services/lcu/ipc-handlers.ts` → `src/preload/preload.ts` → `src/renderer/native/electron-api.ts`）
 - 自动截图服务：`src/main/auto-screenshot-service.ts`
 - 英雄详情窗口：`src/main/modules/window-manager.ts` 的 `createPopupWindow()` 和 renderer 路由 `/augment-overlay`
 - 海克斯顶部浮窗：`src/main/modules/window-manager.ts` 的 `createFloatingWindow()` 和 renderer 路由 `/floating-overlay`
@@ -50,6 +53,13 @@ GET /lol-gameflow/v1/gameflow-phase
 
 `app-config.ts` 将每次 LCU phase 输入 `GameSessionCoordinator`。状态机先映射为 `client-ready`、`champ-select`、`game-loading`、`in-progress` 或 `post-game`，再返回需要执行的阶段入口效果；同一 phase 的重复事件不会重复启动服务、创建窗口或清理状态。窗口、LCU、截图和 OCR 调用仍留在主进程副作用层，状态转换本身不依赖 Electron。
 
+## 斗魂会话判定（M3）
+
+`lcu-get-arena-session` 返回当前斗魂上下文。判定依据是队列 id `1700` 或 gameMode `CHERRY`，两者任一命中即视为斗魂；命中来源记录在 `queueEvidence`。选人阶段会同时读取选人会话，提前拿到英雄和队列提示；离开选人后英雄来自英雄监控记住的值（`championSource: 'remembered'`）。
+
+`status` 取值：`unavailable`（LCU 不可用）、`unknown`（连上了但还拿不到队列信息）、`not-arena`（已知的其他模式）、`arena`。已知非斗魂对局一定不携带英雄（`championId: null`）。
+
+关键限制：LCU 的 `InProgress` 覆盖整场对局，无法区分回合内的采购阶段。因此斗魂对局中的 `shoppingPhase` 返回 `'unknowable'`，不猜测；M4 的视觉/OCR 门禁确认后会通过 `shoppingPhaseSignal` 覆盖该推断。
 ## Renderer 查询示例
 
 Renderer 只能通过 preload 暴露的业务 API 访问：

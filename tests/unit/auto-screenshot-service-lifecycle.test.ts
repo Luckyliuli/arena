@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolveCaptureStage } from '../../src/main/auto-screenshot-policy.ts'
+import { catalogAugmentIds } from '../../src/main/services/arena-augment-data/index.ts'
 
 const mocks = vi.hoisted(() => ({
   captureScreenshot: vi.fn(),
@@ -59,6 +60,7 @@ vi.mock('../../src/main/modules/app-store.ts', () => ({
 }))
 vi.mock('../../src/main/modules/app-paths.ts', () => ({
   getPartialOcrScreenshotDir: vi.fn(() => '/tmp/aramgg-client-ocr-test'),
+  getArenaAugmentCacheDir: vi.fn(() => '/tmp/aramgg-client-augment-cache-test'),
 }))
 vi.mock('../../src/main/augment-partial-merge.ts', () => ({
   createInitialPartialAugmentSelection: vi.fn(() => null),
@@ -203,6 +205,34 @@ describe.sequential('automatic screenshot service lifecycle', () => {
     expectNextCaptureToUseGate(service)
   })
 
+  it('enriches detected candidates through the Arena adapter and marks mock data', async () => {
+    process.env.ARENA_AUGMENT_SOURCE = 'mock'
+    try {
+      const service = createRunningIdleService()
+      const [leftId, centerId, rightId] = catalogAugmentIds().slice(0, 3)
+      const result = await service._loadAugmentWinratePayload({
+        championId: 1,
+        augments: [
+          { id: rightId, name: 'right', detectedSlot: 2 },
+          { id: leftId, name: 'left', detectedSlot: 0 },
+          { id: centerId, name: 'center', detectedSlot: 1 },
+        ],
+      })
+
+      expect(result.recommendationMock).toBe(true)
+      expect(result.recommendationSource).toBe('mock')
+      expect(result.winrateResultCount).toBe(3)
+      expect(result.augments.map(augment => augment.detectedSlot)).toEqual([2, 0, 1])
+      expect(result.augments.every(augment => typeof augment.recommendScore === 'number')).toBe(true)
+      expect(result.augments.every(augment => typeof augment.winRate === 'number')).toBe(true)
+      expect(result.augments.every(augment => augment.mock === true)).toBe(true)
+      expect(result.augments.filter(augment => augment.isTopPick)).toHaveLength(1)
+      expect(result.topPickAugmentId).not.toBeNull()
+      expect(result.topPickDetectedSlot).not.toBeNull()
+    } finally {
+      delete process.env.ARENA_AUGMENT_SOURCE
+    }
+  })
   it('returns an unconfirmed partial recognition to gate backoff', async () => {
     const service = createRunningIdleService()
     const startedAt = Date.now()
@@ -231,5 +261,27 @@ describe.sequential('automatic screenshot service lifecycle', () => {
     expect(service.candidateStreak).toBe(0)
     expect(service.fullOcrCooldownUntil).toBeGreaterThan(startedAt)
     expectNextCaptureToUseGate(service)
+  })
+  it('suppresses the recommendation payload when no champion is known', async () => {
+    const service = createRunningIdleService()
+    const send = vi.fn()
+    mocks.windows.push({
+      isDestroyed: () => false,
+      webContents: { getURL: () => 'http://localhost/#/floating-overlay', send },
+    })
+
+    await service._notifyAugmentDetected({
+      timestamp: Date.now(),
+      analysis: {
+        confidence: 1,
+        partialUpdate: false,
+        augments: [{ id: 1, name: '测试强化符文', detectedSlot: 0 }],
+        slotDiagnostics: [],
+        augmentGate: { titleActivity: { likely: true }, rerollButtons: { visible: false } },
+      },
+    })
+
+    expect(send).not.toHaveBeenCalled()
+    expect(mocks.logger.info).toHaveBeenCalledWith('Augment recommendation suppressed: champion unknown')
   })
 })

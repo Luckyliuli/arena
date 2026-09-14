@@ -9,6 +9,7 @@ import {
   resolveTrustedClientDataUrl,
 } from '../shared/client-data-security.ts'
 import { rankAugmentRecommendations } from '../shared/augment-ranking.ts'
+import { loadAugmentArenaDictionary } from '../shared/augment-dictionary.ts'
 
 declare const fetch: any
 
@@ -120,6 +121,7 @@ const detailCache = new Map<string, any>()
 const augmentDetailCache = new Map<string, Record<string, any>>()
 const championAugmentStatsCache = new Map<string, any[]>()
 const championAugmentStatsPending = new Map<string, Promise<any[]>>()
+const augmentIdAliasCache = new Map<string, Map<string, string>>()
 const activeDataSetPromises = new Map<SupportedDataLocale, Promise<ActiveDataSet>>()
 const activeDataSetCaches = new Map<SupportedDataLocale, { data: ActiveDataSet; createdAt: number }>()
 const activeDataSetRefreshPromises = new Map<SupportedDataLocale, Promise<ActiveDataSet | null>>()
@@ -1917,6 +1919,24 @@ function mapPublicAugmentStats(augment: any): any {
   }
 }
 
+/**
+ * 数据源只给部分符文提供英雄专属胜率，缺失时用全局限定表的胜率兜底，
+ * 避免浮窗/弹窗里识别到的符文没有胜率可显示。只补空缺，不覆盖英雄专属数值。
+ */
+function mergeMissingAugmentRates(stats: any, globalStats: any): any {
+  if (!globalStats) {
+    return stats
+  }
+
+  return {
+    ...stats,
+    win_rate: stats.win_rate ?? globalStats.win_rate ?? null,
+    pick_rate: stats.pick_rate ?? globalStats.pick_rate ?? null,
+    num_games: stats.num_games ?? globalStats.num_games ?? null,
+    num_win_games: stats.num_win_games ?? globalStats.num_win_games ?? null,
+  }
+}
+
 function getLegacyAugmentRecommendScore(stats: any): number | null {
   const winRate = toNullableNumber(stats.win_rate)
   if (winRate == null) {
@@ -1930,11 +1950,15 @@ function getLegacyAugmentRecommendScore(stats: any): number | null {
 
 function mapPublicAugmentRecommendation(
   augment: any,
-  augmentBaseById: Record<string, any> = {}
+  augmentBaseById: Record<string, any> = {},
+  globalStatsById: Record<string, any> = {}
 ): any {
   const augmentId = augment?.id
   const augmentBase = mapAugmentWithBase(augmentId, augmentBaseById)
-  const stats = mapPublicAugmentStats(augment)
+  const stats = mergeMissingAugmentRates(
+    mapPublicAugmentStats(augment),
+    globalStatsById[String(augmentId)]
+  )
   const winRate = toNullableNumber(stats.win_rate)
   const pickRate = toNullableNumber(stats.pick_rate)
   const games = toNullableNumber(stats.num_games)
@@ -2425,19 +2449,94 @@ export async function loadAugmentDetail(locale: SupportedDataLocale = activeData
   return detail
 }
 
+/**
+ * 全局限定表（augments.json）里的符文胜率，按 id 索引。
+ * 英雄分片缺少该符文的胜率时用它兜底。
+ */
+async function loadAugmentGlobalStatsById(
+  locale: SupportedDataLocale = activeDataLocale
+): Promise<Record<string, any>> {
+  const payload = await loadAugmentsPayload(normalizeDataLocale(locale))
+  return extractList(payload, 'augments').reduce((result: Record<string, any>, augment: any) => {
+    if (augment?.id != null) {
+      result[String(augment.id)] = mapPublicAugmentStats(augment)
+    }
+    return result
+  }, {})
+}
+
+/**
+ * 斗魂字典用的是 CDR id（1..405），本地 dtodo 表用的是自己的 id（多数是
+ * 1000 + CDR id，但存在例外，不能盲信加法）。可靠的做法是拿全局表里的
+ * key（ARAM_<apiName>）和字典的 apiName 对上。返回 请求 id -> 本地 id，
+ * 只包含确实对得上的映射；对不上的由调用方按"没有数据"处理。
+ */
+export async function resolveLocalAugmentIdAliases(
+  augmentIds: Array<string | number>,
+  requestedLocale: SupportedDataLocale = activeDataLocale
+): Promise<Map<string, string>> {
+  const wanted = augmentIds
+    .map((id) => String(id ?? '').trim())
+    .filter(Boolean)
+  const aliases = new Map<string, string>()
+  if (!wanted.length) {
+    return aliases
+  }
+
+  const locale = normalizeDataLocale(requestedLocale)
+  let aliasByCdrId = augmentIdAliasCache.get(locale)
+  if (!aliasByCdrId) {
+    const payload = await loadAugmentsPayload(locale)
+    const localIdByApiName = new Map<string, string>()
+    extractList(payload, 'augments').forEach((augment: any) => {
+      const key = typeof augment?.key === 'string' ? augment.key : ''
+      const apiName = key.replace(/^ARAM_/i, '').trim().toLowerCase()
+      if (augment?.id != null && apiName) {
+        localIdByApiName.set(apiName, String(augment.id))
+      }
+    })
+
+    aliasByCdrId = new Map<string, string>()
+    loadAugmentArenaDictionary().forEach((record) => {
+      const apiName = String(record.apiName || '').trim().toLowerCase()
+      const localId = apiName ? localIdByApiName.get(apiName) : undefined
+      if (localId) {
+        aliasByCdrId!.set(String(record.id), localId)
+      }
+    })
+    augmentIdAliasCache.set(locale, aliasByCdrId)
+  }
+
+  wanted.forEach((id) => {
+    const localId = aliasByCdrId!.get(id)
+    if (localId && localId !== id) {
+      aliases.set(id, localId)
+    }
+  })
+
+  return aliases
+}
+
 export async function loadChampionAugments(
   championId: string | number,
   requestedLocale: SupportedDataLocale = activeDataLocale
 ): Promise<Record<string, any>> {
   try {
-    const detail = await loadChampionDetailPayload(championId, normalizeDataLocale(requestedLocale))
+    const locale = normalizeDataLocale(requestedLocale)
+    const [detail, globalStatsById] = await Promise.all([
+      loadChampionDetailPayload(championId, locale),
+      loadAugmentGlobalStatsById(locale),
+    ])
 
     if (Array.isArray(detail?.augments)) {
       const rankedStats = rankAugmentRecommendations(
         detail.augments
           .filter((augment: any) => augment?.id != null)
           .map((augment: any) => {
-            const stats = mapPublicAugmentStats(augment)
+            const stats = mergeMissingAugmentRates(
+              mapPublicAugmentStats(augment),
+              globalStatsById[String(augment.id)]
+            )
             return {
               augmentId: augment.id,
               ...stats,
@@ -2558,14 +2657,18 @@ export async function getAugmentWinrate(
   augmentId: string | number,
   requestedLocale: SupportedDataLocale = activeDataLocale
 ): Promise<any> {
-  const augments = await loadChampionAugments(championId, normalizeDataLocale(requestedLocale))
+  const locale = normalizeDataLocale(requestedLocale)
+  const augments = await loadChampionAugments(championId, locale)
   const augmentIdStr = String(augmentId)
+  const resolvedId = augments[augmentIdStr]
+    ? augmentIdStr
+    : (await resolveLocalAugmentIdAliases([augmentId], locale)).get(augmentIdStr)
 
-  if (!augments[augmentIdStr]) {
+  if (!resolvedId || !augments[resolvedId]) {
     return null
   }
 
-  const winrateData = augments[augmentIdStr]
+  const winrateData = augments[resolvedId]
   return {
     augmentId: parseInt(augmentIdStr, 10),
     tier: toNullableNumber(winrateData.tier),
@@ -2597,16 +2700,17 @@ export async function getChampionAugmentStats(
   }
 
   const request = (async () => {
-    const [detail, augmentBaseById] = await Promise.all([
+    const [detail, augmentBaseById, globalStatsById] = await Promise.all([
       loadChampionDetailPayload(normalizedChampionId, dataSet.locale),
       loadAugmentDetail(dataSet.locale),
+      loadAugmentGlobalStatsById(dataSet.locale),
     ])
     const augments = Array.isArray(detail?.augments) ? detail.augments : []
 
     const result = rankAugmentRecommendations(
       augments
         .filter((augment: any) => augment?.id != null)
-        .map((augment: any) => mapPublicAugmentRecommendation(augment, augmentBaseById))
+        .map((augment: any) => mapPublicAugmentRecommendation(augment, augmentBaseById, globalStatsById))
     )
 
     championAugmentStatsCache.set(cacheKey, result)
@@ -2635,6 +2739,7 @@ export function clearCache(): void {
   augmentDetailCache.clear()
   championAugmentStatsCache.clear()
   championAugmentStatsPending.clear()
+  augmentIdAliasCache.clear()
   activeDataSetPromises.clear()
   activeDataSetCaches.clear()
   activeDataSetRefreshPromises.clear()

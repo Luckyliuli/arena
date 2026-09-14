@@ -351,7 +351,6 @@ import {
     ChevronRight,
     ClipboardList,
     Cpu,
-    Database,
     Download,
     FolderSearch,
     Languages,
@@ -495,7 +494,6 @@ const changeLocale = async (requestedLocale = selectedLocale.value) => {
         return
     }
 
-    const previousLocale = activeLocale.value
     selectedLocale.value = requestedLocale
     localeLoading.value = true
     try {

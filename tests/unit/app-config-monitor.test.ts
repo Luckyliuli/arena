@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   write: vi.fn(),
   phase: vi.fn(),
   snapshot: vi.fn(),
+  gameflowSession: vi.fn(),
   subscribe: vi.fn(),
   createMain: vi.fn(),
   ensurePopup: vi.fn(),
@@ -40,13 +41,15 @@ vi.mock('../../src/main/modules/window-manager.ts', () => ({
 vi.mock('../../src/main/screenshot.ts', () => ({ getLolGameStatus: async () => ({ isGameOpen: false }) }))
 vi.mock('../../src/main/modules/ipc-handlers.ts', () => ({ registerIpcHandlers: vi.fn() }))
 vi.mock('../../src/main/auto-screenshot-service.ts', () => ({ default: {
-  isRunning: false, setGameflowPhase: vi.fn(), clearAugmentState: vi.fn(),
+  isRunning: false, stop: vi.fn(() => true), getConfig: vi.fn(() => ({ controlOwner: 'gameflow' })),
+  setGameflowPhase: vi.fn(), clearAugmentState: vi.fn(),
   setConfig: vi.fn(), start: vi.fn(async () => true),
 } }))
 vi.mock('../../src/main/services/lcu/lcu-service.ts', () => ({ getLCUServiceInstance: () => ({
   getAuthToken: async () => ({ url: 'https://127.0.0.1:2999' }),
   getUrl: () => 'https://127.0.0.1:2999', isActive: () => true,
   getGameflowPhase: mocks.phase, getChampSelectSnapshot: mocks.snapshot,
+  getGameflowSession: mocks.gameflowSession,
   subscribeGameflowPhase: mocks.subscribe,
 }) }))
 vi.mock('../../src/main/services/match-history/background-sync.ts', () => ({
@@ -85,6 +88,7 @@ beforeEach(() => {
   mocks.write.mockImplementation((key, value) => mocks.store.set(key, value))
   mocks.phase.mockResolvedValue('None')
   mocks.snapshot.mockResolvedValue({ gameflowPhase: 'ChampSelect', selfChampionId: 22, benchChampions: [], status: 'ready' })
+  mocks.gameflowSession.mockResolvedValue({ gameData: { queue: { id: 1700, gameMode: 'CHERRY' } } })
   mocks.subscribe.mockResolvedValue({ isConnected: () => false, close: vi.fn() })
   mocks.createMain.mockResolvedValue({})
   mocks.ensurePopup.mockResolvedValue(mocks.popup)
@@ -163,6 +167,39 @@ describe('main-process monitoring ownership', () => {
     resolve('None')
     await vi.advanceTimersByTimeAsync(1000)
     expect(mocks.phase).toHaveBeenCalledTimes(3)
+  })
+
+  it('starts gameflow auto capture only for an Arena match', async () => {
+    await start()
+    const phaseChanged = mocks.subscribe.mock.calls[0][0]
+    const { default: autoScreenshotService } = await import('../../src/main/auto-screenshot-service.ts')
+
+    mocks.gameflowSession.mockResolvedValue({ gameData: { queue: { id: 1700, gameMode: 'CHERRY' } } })
+    await phaseChanged('InProgress')
+    expect(autoScreenshotService.start).toHaveBeenCalled()
+
+    vi.mocked(autoScreenshotService.start).mockClear()
+    mocks.gameflowSession.mockResolvedValue({ gameData: { queue: { id: 450, gameMode: 'ARAM' } } })
+    await phaseChanged('WaitingForStats')
+    await phaseChanged('InProgress')
+
+    expect(autoScreenshotService.start).not.toHaveBeenCalled()
+    expect(mocks.logError).not.toHaveBeenCalled()
+  })
+  it('stops gameflow capture and clears the overlay when an Arena match ends', async () => {
+    await start()
+    const phaseChanged = mocks.subscribe.mock.calls[0][0]
+    const { default: autoScreenshotService } = await import('../../src/main/auto-screenshot-service.ts')
+
+    mocks.gameflowSession.mockResolvedValue({ gameData: { queue: { id: 1700, gameMode: 'CHERRY' } } })
+    await phaseChanged('InProgress')
+    expect(autoScreenshotService.start).toHaveBeenCalled()
+
+    autoScreenshotService.isRunning = true
+    await phaseChanged('WaitingForStats')
+
+    expect(autoScreenshotService.stop).toHaveBeenCalledWith('gameflow')
+    expect(autoScreenshotService.clearAugmentState).toHaveBeenCalledWith('LCU phase WaitingForStats')
   })
 
   it('does not show an obsolete champion after the game changes while the popup loads', async () => {

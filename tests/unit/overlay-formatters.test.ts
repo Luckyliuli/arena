@@ -16,10 +16,10 @@ describe('overlay formatters', () => {
     expect(formatPercent(null)).toBe('--')
   })
 
-  it('labels only missing augment win rates as insufficient games', () => {
-    expect(formatAugmentWinRate(null)).toBe('场次不足')
-    expect(formatAugmentWinRate(undefined)).toBe('场次不足')
-    expect(formatAugmentWinRate('')).toBe('场次不足')
+  it('keeps missing augment win rates distinct with an explicit dash', () => {
+    expect(formatAugmentWinRate(null)).toBe('--')
+    expect(formatAugmentWinRate(undefined)).toBe('--')
+    expect(formatAugmentWinRate('')).toBe('--')
     expect(formatAugmentWinRate(0)).toBe('0.0%')
     expect(formatAugmentWinRate(0.523)).toBe('52.3%')
     expect(formatAugmentWinRate('invalid')).toBe('--')

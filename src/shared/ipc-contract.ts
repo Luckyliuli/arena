@@ -171,6 +171,49 @@ export interface LcuGameflowResult extends OperationResult {
   phase: GameflowPhase | null
 }
 
+/**
+ * Arena (斗魂竞技场) session context derived from LCU gameflow data.
+ * Pure derivation lives in
+ * src/main/services/arena-session/arena-session-state.ts.
+ */
+export type ArenaShoppingPhase = 'shopping' | 'not-shopping' | 'unknowable'
+
+/** Which field proved the queue is Arena. `null` means the queue is unresolved. */
+export type ArenaQueueEvidence = 'queue-id' | 'game-mode' | null
+
+/** Where the champion id came from. `null` means no champion could be read. */
+export type ArenaChampionSource = 'champ-select' | 'remembered' | null
+
+export type ArenaSessionStatus = 'unavailable' | 'unknown' | 'not-arena' | 'arena'
+
+export interface ArenaSessionState {
+  /** LCU reported itself reachable. */
+  connected: boolean
+  /** Gameflow phase, normalized. */
+  phase: string | null
+  status: ArenaSessionStatus
+  /** `true`/`false` once the queue is identified; `null` when it is not. */
+  isArena: boolean | null
+  queueEvidence: ArenaQueueEvidence
+  queueId: number | null
+  gameMode: string | null
+  championId: number | null
+  championSource: ArenaChampionSource
+  /**
+   * `unknowable` is a real answer: LCU only exposes the coarse `InProgress`
+   * phase, so the shopping phase needs a visual/OCR signal before it can be
+   * asserted. Never guess.
+   */
+  shoppingPhase: ArenaShoppingPhase
+  /** Diagnostic only; never user-visible copy. */
+  reason: string | null
+  updatedAt: number
+}
+
+export interface LcuArenaSessionResult extends OperationResult {
+  session: ArenaSessionState | null
+}
+
 export interface LocaleInfo extends LooseRecord {
   locale: SupportedDataLocale
   dataVersion?: string
@@ -181,13 +224,47 @@ export interface LocaleInfo extends LooseRecord {
   }>
 }
 
+export type ArenaRecommendationTier =
+  | 'must-pick'
+  | 'strong'
+  | 'recommended'
+  | 'optional'
+  | 'niche'
+
+/**
+ * One augment card slot as the main process ships it to the overlay windows.
+ *
+ * Declared here rather than left to each renderer to infer: the popup reads
+ * these fields straight off the payload, and a field that never reaches the
+ * contract silently degrades to `unknown` on the renderer side.
+ */
+export interface ArenaOverlayAugmentPayload extends LooseRecord {
+  id?: number | null
+  augmentId?: number | null
+  name?: string
+  rarity?: ArenaAugmentRarity
+  iconPath?: string | null
+  detectedSlot?: number | null
+  missing?: boolean
+  recommendScore?: number | null
+  recommendationTier?: ArenaRecommendationTier | null
+  isTopPick?: boolean
+  pickRate?: number | null
+  mock?: boolean
+  dataAvailable?: boolean
+}
+
 export interface OverlayPayload extends LooseRecord {
   championId?: number | null
   championName?: string
-  augments?: LooseRecord[]
+  augments?: ArenaOverlayAugmentPayload[]
   dataSource?: string
   timestamp?: number
   error?: string
+  recommendationMock?: boolean
+  recommendationSource?: string
+  topPickAugmentId?: number | null
+  topPickDetectedSlot?: number | null
 }
 
 export interface GamePhaseChangedPayload {
@@ -355,6 +432,7 @@ export interface ElectronAPI {
     getPerkList(): Promise<LcuPerkListResult>
     applyPerk(data: LooseRecord): Promise<OperationResult>
     getGameflowPhase(): Promise<LcuGameflowResult>
+    getArenaSession(): Promise<LcuArenaSessionResult>
     getManualLeaguePath(): Promise<LooseRecord>
     selectManualLeaguePath(): Promise<LooseRecord>
     validateManualLeaguePath(lolPath: string): Promise<LooseRecord>

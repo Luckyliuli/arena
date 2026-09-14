@@ -81,16 +81,21 @@ export type ArenaAugmentSource = {
 
 const SOURCE_ENV = 'ARENA_AUGMENT_SOURCE'
 
+/**
+ * Real OP.GG stats are the default. Placeholder sources must be asked for
+ * explicitly via `ARENA_AUGMENT_SOURCE` — an unset or unrecognised value
+ * must never silently serve fabricated numbers to the UI.
+ */
 export function selectAugmentSource(opts?: { opgg?: OpggSourceOptions }): ArenaAugmentSource {
-  const wanted = (process.env[SOURCE_ENV] || 'mock').toLowerCase()
+  const wanted = (process.env[SOURCE_ENV] || '').toLowerCase()
   switch (wanted) {
-    case 'opgg':
-      return opggSource(opts?.opgg)
+    case 'mock':
+      return mockSource()
     case 'communitydragon':
       return communityDragonSource()
-    case 'mock':
+    case 'opgg':
     default:
-      return mockSource()
+      return opggSource(opts?.opgg)
   }
 }
 
@@ -156,7 +161,7 @@ function deterministicStatsFor(augmentId: number, slot: 'mock' | 'cdr'): Augment
 // Backing implementations ----------------------------------------------
 
 /**
- * The default source for now: returns deterministic mock stats based on
+ * Explicit opt-in placeholder: returns deterministic mock stats based on
  * the augment id. Same id → same numeric output across calls and runs.
  */
 function mockSource(): ArenaAugmentSource {

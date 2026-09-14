@@ -26,9 +26,9 @@ import {
     DEFAULT_DATA_LOCALE,
     SUPPORTED_DATA_LOCALES,
     getDataLocale,
-    loadAugmentBaseForOcrLocale,
     tryNormalizeDataLocale,
 } from './data-loader.ts'
+import { loadArenaOcrLocaleData } from './services/arena-augment-data/ocr-dictionary.ts'
 import logger from './modules/logger.ts'
 import { ensureOnnxruntimeNativeDllPath } from './modules/onnxruntime-native-path.ts'
 import { discoverLcuAuthFromProcess } from './services/lcu/process-auth-discovery.ts'
@@ -88,9 +88,15 @@ const AUGMENT_LOCALE_RETRY_DELAY_MS = 30 * 1000
 const RIOT_CLIENT_REGION_LOCALE_ENDPOINT = '/riotclient/region-locale'
 const riotClientLocaleHttpsAgent = new https.Agent({ rejectUnauthorized: false })
 const AUGMENT_RARITY_MAP = {
+    // Legacy ARAM client-data shape.
     'kSilver': 'silver',
     'kGold': 'gold',
     'kPrismatic': 'prismatic',
+    // The bundled Arena dictionary already ships normalized rarity strings.
+    'silver': 'silver',
+    'gold': 'gold',
+    'prismatic': 'prismatic',
+    'unknown': 'unknown',
 }
 
 function getSupportedOcrLocales() {
@@ -324,7 +330,7 @@ async function loadAugmentOcrLocale(locale) {
 
     const request = (async () => {
         try {
-            const result = await loadAugmentBaseForOcrLocale(locale)
+            const result = loadArenaOcrLocaleData(locale)
             if (result.locale !== locale) {
                 throw new Error(`requested ${locale}, received ${result.locale}`)
             }
@@ -2156,6 +2162,7 @@ export async function matchAugmentDatabase(recognizedText) {
             matchName: candidate.matchName || candidate.augmentData.name,
             matchLocale: candidate.matchLocale || DEFAULT_DATA_LOCALE,
             rarity: candidate.augmentData.rarity,
+            iconPath: candidate.augmentData.iconPath || null,
             confidence,
         })
     }

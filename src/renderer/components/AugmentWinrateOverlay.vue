@@ -1125,9 +1125,9 @@ const showOverlay = async (data) => {
       })
 
       const championAugmentRows = mapChampionAugmentRows(augments, augStats)
-      if (championAugmentRows.length > 0) {
-        displayAugments.value = championAugmentRows
-      } else if (data.augments && data.augments.length > 0) {
+      // 识别到的三张候选优先于英雄全量榜单：弹窗要显示"这一轮抽到的"符文，
+      // 而不是英雄详情里的完整列表。payload 里没有候选时才回退到全量。
+      if (data.augments && data.augments.length > 0) {
         const hasWinrateData = data.augments.some(aug => 'winRate' in aug)
 
         if (hasWinrateData) {
@@ -1171,6 +1171,8 @@ const showOverlay = async (data) => {
             displayAugments.value = mapIncomingAugmentsForFallback(data.augments)
           }
         }
+      } else if (championAugmentRows.length > 0) {
+        displayAugments.value = championAugmentRows
       } else {
         displayAugments.value = []
       }

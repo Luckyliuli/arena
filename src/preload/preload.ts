@@ -116,6 +116,7 @@ const electronAPI: ElectronAPI = {
     getPerkList: () => ipcRenderer.invoke('lcu-get-perk-list'),
     applyPerk: (data) => ipcRenderer.invoke('lcu-apply-perk', data),
     getGameflowPhase: () => ipcRenderer.invoke('lcu-get-gameflow-phase'),
+    getArenaSession: () => ipcRenderer.invoke('lcu-get-arena-session'),
     getManualLeaguePath: () => ipcRenderer.invoke('lcu-get-manual-league-path'),
     selectManualLeaguePath: () => ipcRenderer.invoke('lcu-select-manual-league-path'),
     validateManualLeaguePath: (lolPath) => ipcRenderer.invoke('lcu-validate-manual-league-path', lolPath),

@@ -31,6 +31,7 @@ import {
     raiseOverlayWindow,
 } from './modules/window-manager.ts'
 import { shouldRaiseOverlayWindow } from './modules/overlay-window-state.ts'
+import { shoppingPhaseSignalStore } from './services/arena-session/shopping-phase-signal.ts'
 import store from './modules/app-store.ts'
 import { getPartialOcrScreenshotDir } from './modules/app-paths.ts'
 import {
@@ -167,7 +168,7 @@ function getPayloadAugmentIds(augments = []) {
     return augments
         .slice(0, 3)
         .map(augment => Number(augment?.id ?? augment?.augmentId))
-        .filter(id => Number.isFinite(id))
+        .filter(id => Number.isInteger(id) && id > 0)
 }
 
 function isConfirmedAugmentSelectionUi(analysis = {}) {
@@ -611,6 +612,7 @@ class AutoScreenshotService {
      */
     async _analyzeGateScreenshot(imageBuffer, runId = this.runId) {
         const gateResult = await analyzeScreenshotGate(imageBuffer)
+        shoppingPhaseSignalStore.recordGate(gateResult)
         if (!gateResult.success) {
             logger.debug('Augment selection gate analysis failed', {
                 error: gateResult.error,
@@ -732,6 +734,11 @@ class AutoScreenshotService {
             const analysisStart = performance.now()
             const analysisResult = await analyzeScreenshot(imageBuffer)
             const analysisDuration = performance.now() - analysisStart
+
+            // Feed the visual shopping-phase signal on every frame, even when
+            // no recommendation will be produced, so the session state still
+            // learns whether the augment offer screen is up.
+            shoppingPhaseSignalStore.record(analysisResult)
 
             if (!analysisResult.success) {
                 this._logAnalysisMiss('analysis-failed', {
@@ -1180,42 +1187,75 @@ class AutoScreenshotService {
 
     async _loadAugmentWinratePayload(winrateData) {
         const championId = winrateData.championId
-        const augmentIds = getPayloadAugmentIds(winrateData.augments)
-        if (!championId || augmentIds.length === 0) {
+        const candidates = winrateData.augments.slice(0, 3).map((augment, index) => {
+            const rawId = Number(augment?.id ?? augment?.augmentId)
+            return {
+                augmentId: Number.isInteger(rawId) && rawId > 0 ? rawId : null,
+                detectedSlot: Number.isInteger(augment?.detectedSlot) ? augment.detectedSlot : index,
+            }
+        })
+
+        if (!championId || !candidates.some(candidate => candidate.augmentId != null)) {
             return null
         }
 
         const startedAt = Date.now()
         try {
-            const { getChampionAugmentStats } = await import('./data-loader.ts')
-            const augmentStats = await getChampionAugmentStats(championId)
-            const augmentIdSet = new Set(augmentIds)
-            const statById = new Map(
-                augmentStats
-                    .filter(augment => augmentIdSet.has(Number(augment.augmentId ?? augment.id)))
-                    .map(augment => [Number(augment.augmentId ?? augment.id), augment])
+            const {
+                fileOpggCache,
+                recommendArenaAugmentCandidates,
+                selectAugmentSource,
+            } = await import('./services/arena-augment-data/index.ts')
+            const { getArenaAugmentCacheDir } = await import('./modules/app-paths.ts')
+            const source = selectAugmentSource({
+                opgg: { cache: fileOpggCache(getArenaAugmentCacheDir()) },
+            })
+            const bundle = await source.getStatsForChampion(championId)
+            const recommendations = recommendArenaAugmentCandidates(candidates, bundle)
+            const recommendationBySlot = new Map(
+                recommendations.candidates.map(item => [item.detectedSlot, item])
             )
-            const enrichedAugments = winrateData.augments.map(augment => {
-                const augmentId = Number(augment?.id ?? augment?.augmentId)
-                const stat = statById.get(augmentId)
-                if (!stat || augment?.missing) {
+            const enrichedAugments = winrateData.augments.map((augment, index) => {
+                const detectedSlot = Number.isInteger(augment?.detectedSlot) ? augment.detectedSlot : index
+                const recommendation = recommendationBySlot.get(detectedSlot)
+                if (augment?.missing || !recommendation || recommendation.augmentId == null) {
                     return augment
                 }
 
                 return {
                     ...augment,
-                    ...stat,
-                    id: stat.id || stat.augmentId || augment.id,
-                    augmentId: stat.augmentId || stat.id || augment.id,
+                    id: recommendation.augmentId,
+                    augmentId: recommendation.augmentId,
+                    pickRate: recommendation.pickRate,
+                    winRate: recommendation.winRate,
+                    averagePlacement: recommendation.averagePlacement,
+                    firstPlaceRate: recommendation.firstPlaceRate,
+                    sampleSize: recommendation.sampleSize,
+                    recommendScore: recommendation.recommendScore,
+                    recommendationTier: recommendation.recommendationTier,
+                    isTopPick: recommendation.isTopPick,
+                    dataAvailable: recommendation.recommendScore != null,
+                    mock: recommendation.mock,
                     detectedSlot: augment.detectedSlot,
                     missing: false,
                 }
             })
 
-            logger.debug('Augment winrate enriched in main', {
+            if (bundle.reason) {
+                const level = bundle.reason === 'page-shape-changed' ? 'warn' : 'info'
+                logger[level]('[arena-augment] recommendation source returned no records', {
+                    championId,
+                    source: source.id,
+                    reason: bundle.reason,
+                })
+            }
+
+            logger.debug('Arena augment recommendations enriched in main', {
                 championId,
-                augmentIds,
-                resultCount: statById.size,
+                augmentIds: candidates.map(candidate => candidate.augmentId).filter(Boolean),
+                source: recommendations.source,
+                mock: recommendations.mock,
+                scoredCount: recommendations.scoredCount,
                 durationMs: Date.now() - startedAt,
             })
 
@@ -1224,10 +1264,16 @@ class AutoScreenshotService {
                 augments: enrichedAugments,
                 winrateInMain: true,
                 winratePending: false,
-                winrateResultCount: statById.size,
+                winrateResultCount: recommendations.scoredCount,
+                recommendationMock: recommendations.mock,
+                recommendationSource: recommendations.source,
+                recommendationFetchedAt: recommendations.fetchedAt,
+                recommendationReason: recommendations.reason,
+                topPickAugmentId: recommendations.topPick?.augmentId ?? null,
+                topPickDetectedSlot: recommendations.topPick?.detectedSlot ?? null,
             }
         } catch (error) {
-            logger.warn('Failed to enrich augment winrate in main:', error.message)
+            logger.warn('Failed to enrich arena augment recommendations in main:', error.message)
             return {
                 ...winrateData,
                 winrateInMain: true,
@@ -1236,7 +1282,6 @@ class AutoScreenshotService {
             }
         }
     }
-
     async _sendAugmentDetectedPayload(winrateData, notifyMode = 'detected') {
         try {
             if (!this.isRunning || !this._isCurrentAugmentPayload(winrateData)) return
@@ -1322,9 +1367,11 @@ class AutoScreenshotService {
             const championId = store.get('lastSelectedChampionId')
 
             if (!championId) {
-                logger.warn('⚠️ 未找到缓存的英雄ID，海克斯推荐可能无法显示胜率数据')
-            } else {
-                logger.debug(`📌 使用缓存的英雄ID: ${championId}`)
+                // The shopping-phase signal was already recorded from this frame;
+                // without a champion there is no recommendation to show, so the
+                // popup stays closed rather than opening an empty overlay.
+                logger.info('Augment recommendation suppressed: champion unknown')
+                return
             }
 
             const baseWinrateData = {
@@ -1335,6 +1382,7 @@ class AutoScreenshotService {
                     id: aug.id ?? null,
                     name: aug.name || '',
                     rarity: aug.rarity || 'unknown',
+                    iconPath: aug.iconPath || null,
                     confidence: aug.confidence ?? null,
                     detectedSlot: Number.isInteger(aug.detectedSlot) ? aug.detectedSlot : index,
                     missing: aug.missing === true,

@@ -34,6 +34,7 @@ import {
 const LCU_ENDPOINT_PROBE_TIMEOUT_MS = 2500
 const LCU_MATCH_HISTORY_TIMEOUT_MS = 10 * 1000
 const LCU_ENTITLEMENTS_TIMEOUT_MS = 5 * 1000
+const LCU_GAMEFLOW_TIMEOUT_MS = 5 * 1000
 const LCU_CONNECTION_DIAGNOSTIC_INTERVAL_MS = 5 * 60 * 1000
 const LCU_CONNECTION_DIAGNOSTIC_MAX_SIGNATURES = 50
 const RECOVERABLE_LCU_ERROR_CODES = new Set([
@@ -1276,6 +1277,7 @@ export class LCUService {
         ...this.auth,
         httpsAgent: this.httpsAgent,
         validateStatus: (status) => status < 500,
+        timeout: LCU_GAMEFLOW_TIMEOUT_MS,
       })
       logger.debug('Gameflow session:', res.data)
       return res.data

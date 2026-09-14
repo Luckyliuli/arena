@@ -127,7 +127,7 @@ describe('ArenaLeaderboard', () => {
         ],
       },
       ranked: {
-        placement: [
+        picks: [
           {
             augmentId: 1,
             displayName: { en: 'Sample', zh: '示例符文' },
@@ -141,8 +141,8 @@ describe('ArenaLeaderboard', () => {
             sampleSize: 1234,
           },
         ],
+        placement: [],
         firstplace: [],
-        picks: [],
         winrate: [],
       },
       sourceLabel: 'mock',
@@ -150,11 +150,35 @@ describe('ArenaLeaderboard', () => {
     const w = factory()
     await flushPromises()
     expect(w.text()).toContain('示例符文')
+    expect(w.find('.augment-name-en').exists()).toBe(false)
     // The mock-banner is rendered when bundle.mock is true
     expect(w.text()).toContain('mock')
     // Sample-size column is hidden in mock mode (TDD: hide stats that look
-    // fake); the metric column renders 1.50 for placement
-    expect(w.text()).toContain('1.50')
+    // fake); the default tab ranks by pick rate, so the metric column
+    // renders 0.05 as 5.0%
+    expect(w.text()).toContain('5.0%')
+    w.unmount()
+  })
+
+  it('offers only rank tabs that the data source can actually fill', async () => {
+    mockGetStats.mockResolvedValueOnce({
+      success: true,
+      bundle: {
+        fetchedAt: new Date().toISOString(),
+        source: 'opgg',
+        mock: false,
+        records: [],
+      },
+      ranked: { placement: [], firstplace: [], picks: [], winrate: [] },
+      sourceLabel: 'OP.GG',
+    })
+    const w = factory()
+    await flushPromises()
+    // OP.GG publishes pick_rate / win_rate per augment only; average
+    // placement and first-place rate are never available, so those tabs
+    // would render a column of dashes.
+    const labels = w.findAll('.rank-tabs button').map((b) => b.text())
+    expect(labels).toEqual(['\u6309\u9009\u7528\u7387', 'OP.GG \u80dc\u7387'])
     w.unmount()
   })
 })

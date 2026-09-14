@@ -44,7 +44,6 @@
           <td class="rank-col">{{ idx + 1 }}</td>
           <td class="name-col">
             <span class="augment-name">{{ row.displayName.zh || row.displayName.en }}</span>
-            <small v-if="row.displayName.zh" class="augment-name-en">{{ row.displayName.en }}</small>
           </td>
           <td class="rarity-col">
             <span class="rarity-badge" :class="rarityClass(row.rarity)">{{ rarityLabel(row.rarity) }}</span>
@@ -78,9 +77,12 @@ const { t } = useI18n()
 const DEFAULT_CHAMPION_ID = 1
 const DEFAULT_LIMIT = 20
 
+// OP.GG publishes only pick_rate / win_rate / play per augment: it has no
+// average placement or first-place rate at augment granularity, so those
+// two tabs could only ever render a column of dashes. Expose just the
+// dimensions the current source can fill; restore the other two here if a
+// placement-capable source lands behind the same adapter seam.
 const rankOptions: { id: ArenaAugmentRankOrder, titleKey: string }[] = [
-  { id: 'placement', titleKey: 'arenaLeaderboard.rankPlacement' },
-  { id: 'firstplace', titleKey: 'arenaLeaderboard.rankFirstplace' },
   { id: 'picks', titleKey: 'arenaLeaderboard.rankPicks' },
   { id: 'winrate', titleKey: 'arenaLeaderboard.rankWinrate' },
 ]
@@ -110,7 +112,7 @@ const sourceLabel = ref<string>('')
 const loading = ref<boolean>(false)
 const error = ref<string | null>(null)
 const championId = ref<number>(DEFAULT_CHAMPION_ID)
-const currentRank = ref<ArenaAugmentRankOrder>('placement')
+const currentRank = ref<ArenaAugmentRankOrder>('picks')
 
 const rows = computed<ArenaAugmentLeaderboardRow[]>(() => ranked.value[currentRank.value] || [])
 const currentRankLabel = computed<string>(() => t(RANK_TITLE_KEYS[currentRank.value]))
@@ -288,7 +290,6 @@ onMounted(() => { void reload(); });
 .leaderboard-table .sample-col { text-align: right; color: var(--hex-fg-muted, #9aa0aa); font-variant-numeric: tabular-nums; }
 
 .augment-name { display: block; }
-.augment-name-en { color: var(--hex-fg-muted, #9aa0aa); font-size: 10px; }
 
 .rarity-badge {
     display: inline-block;

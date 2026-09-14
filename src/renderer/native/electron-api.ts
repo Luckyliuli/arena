@@ -73,6 +73,7 @@ export const electronAPI: ElectronAPI = {
     getPerkList: (...args) => requireElectronAPI().lcu.getPerkList(...args),
     applyPerk: (...args) => requireElectronAPI().lcu.applyPerk(...args),
     getGameflowPhase: (...args) => requireElectronAPI().lcu.getGameflowPhase(...args),
+    getArenaSession: (...args) => requireElectronAPI().lcu.getArenaSession(...args),
     getManualLeaguePath: (...args) => requireElectronAPI().lcu.getManualLeaguePath(...args),
     selectManualLeaguePath: (...args) => requireElectronAPI().lcu.selectManualLeaguePath(...args),
     validateManualLeaguePath: (...args) =>

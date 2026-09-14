@@ -9,6 +9,8 @@ import logger from '../../modules/logger.ts'
 import { getChampionMonitorState, rememberChampionId } from '../../modules/champion-monitor-state.ts'
 import { getLCUServiceInstance } from './lcu-service.ts'
 import { ChampionIdResult, ChampSelectSnapshot } from './types.ts'
+import { readArenaSessionState } from '../arena-session/arena-session-service.ts'
+import { shoppingPhaseSignalStore } from '../arena-session/shopping-phase-signal.ts'
 import { trustedIpcMain as ipcMain } from '../../security/trusted-ipc.ts'
 
 const getLcuServiceFromStore = async () => {
@@ -123,6 +125,34 @@ export function registerLCUIpcHandlers(): void {
     return {
       success: !!phase,
       phase,
+    }
+  })
+
+  // M3: Arena (斗魂竞技场) awareness. Reports whether the client is in an Arena
+  // match, which champion is being played, and whether the shopping phase can
+  // be asserted. Never mutates game state.
+  ipcMain.handle('lcu-get-arena-session', async () => {
+    const { service, error } = await getLcuServiceFromStore()
+
+    try {
+      const session = await readArenaSessionState({
+        lcu: service,
+        getRememberedChampionId: () => getChampionMonitorState().lastChampionId,
+        getShoppingPhaseSignal: now => shoppingPhaseSignalStore.read(now),
+      })
+
+      return {
+        success: true,
+        session,
+        error: session.status === 'unavailable' ? error ?? session.reason ?? undefined : undefined,
+      }
+    } catch (err) {
+      logger.error('[arena-session] failed to read arena session:', err)
+      return {
+        success: false,
+        session: null,
+        error: err instanceof Error ? err.message : String(err),
+      }
     }
   })
 
