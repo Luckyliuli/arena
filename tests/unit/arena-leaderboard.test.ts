@@ -83,12 +83,12 @@ function statsResult() {
 }
 
 const snapshot = {
-  schemaVersion: 1 as const,
+  schemaVersion: 2 as const,
   patch: '16.18',
   source: 'opgg' as const,
   champions: [
-    { championId: 2, slug: 'Olaf', winRate: 0.54, pickRate: 0.12 },
-    { championId: 1, slug: 'Annie', winRate: 0.52, pickRate: 0.08 },
+    { championId: 2, slug: 'Olaf', winRate: 0.54, pickRate: 0.12, averagePlacement: 3.1 },
+    { championId: 1, slug: 'Annie', winRate: 0.52, pickRate: 0.08, averagePlacement: 3.4 },
   ],
   combinations: {
     trio: [{ championIds: [1, 2, 3], winRate: 0.6, pickRate: 0.03, averagePlacement: 2.8, firstPlaceRate: 0.2, sampleSize: 300 }],

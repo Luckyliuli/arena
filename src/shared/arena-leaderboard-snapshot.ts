@@ -7,6 +7,7 @@ export type ArenaChampionLeaderboardRow = {
   slug: string
   winRate: number | null
   pickRate: number | null
+  averagePlacement: number | null
 }
 
 export type ArenaCombinationLeaderboardRow = {
@@ -19,7 +20,7 @@ export type ArenaCombinationLeaderboardRow = {
 }
 
 export type ArenaLeaderboardSnapshot = {
-  schemaVersion: 1
+  schemaVersion: 2
   patch: string
   source: 'opgg'
   champions: ArenaChampionLeaderboardRow[]
@@ -37,7 +38,7 @@ export function parseArenaLeaderboardSnapshot(raw: string): ArenaLeaderboardSnap
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error('arena-leaderboard-snapshot: expected an object')
   }
-  if (parsed.schemaVersion !== 1 || parsed.source !== 'opgg') {
+  if (parsed.schemaVersion !== 2 || parsed.source !== 'opgg') {
     throw new Error('arena-leaderboard-snapshot: unsupported schema or source')
   }
   if (!Array.isArray(parsed.champions)

@@ -46,7 +46,7 @@ describe('Arena leaderboard snapshot builder', () => {
     })
 
     expect(result.snapshot).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       patch: '16.18',
       source: 'opgg',
       champions: [{
@@ -54,6 +54,7 @@ describe('Arena leaderboard snapshot builder', () => {
         slug: 'Annie',
         winRate: 0.5265,
         pickRate: 0.0763,
+        averagePlacement: null,
       }],
       combinations: {
         trio: [{

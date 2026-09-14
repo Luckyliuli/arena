@@ -98,6 +98,12 @@ export function readArenaGameflowIdentity(session: unknown): ArenaGameflowIdenti
   return { queueId, gameMode }
 }
 
+export function isArenaGameflowSession(session: unknown): boolean {
+  const identity = readArenaGameflowIdentity(session)
+  return identity.queueId === ARENA_QUEUE_ID
+    || identity.gameMode?.toUpperCase() === ARENA_GAME_MODE
+}
+
 function resolveQueueEvidence(
   queueId: number | null,
   gameMode: string | null,

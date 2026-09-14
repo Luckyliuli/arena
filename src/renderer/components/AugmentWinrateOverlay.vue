@@ -85,9 +85,9 @@
               <span>{{ t('augment.pickRate') }}</span>
               <strong>{{ championDataLoading ? t('augment.reading') : formatPercent(championStats?.pickRate) }}</strong>
             </div>
-            <div class="stat-box">
-              <span>{{ t('augment.games') }}</span>
-              <strong>{{ championDataLoading ? t('augment.reading') : formatNumber(championStats?.numGames) }}</strong>
+            <div v-if="thirdChampionStat" class="stat-box">
+              <span>{{ thirdChampionStat.label }}</span>
+              <strong>{{ championDataLoading ? t('augment.reading') : thirdChampionStat.value }}</strong>
             </div>
           </section>
 
@@ -245,6 +245,7 @@ import {
 import { electronAPI } from '../native/electron-api.ts'
 import { sortAugmentsByDetectedOrder } from '../service/augment-order.js'
 import { rankAugmentRecommendations } from '../../shared/augment-ranking.ts'
+import { resolveChampionDetailMetric } from '../../shared/champion-detail-metric.ts'
 import {
   formatAugmentTier,
   formatAugmentWinRate,
@@ -284,6 +285,7 @@ const champSelectMode = ref(false)
 
 // 英雄数据
 const championStats = ref(null)
+const arenaChampionStats = ref(null)
 const augmentBase = ref([])
 const augmentStats = ref({})
 const championLinks = ref({})
@@ -298,6 +300,14 @@ let lastOverlayPayload = null
 const activeDataLocale = ref('zh-CN')
 
 const contentVisible = computed(() => champSelectMode.value || !!championId.value || !!championStats.value)
+const thirdChampionStat = computed(() => {
+  const metric = resolveChampionDetailMetric(championStats.value?.numGames, arenaChampionStats.value?.averagePlacement)
+  if (!metric) return null
+  if (metric.kind === 'games') {
+    return { label: t('augment.games'), value: formatNumber(metric.value) }
+  }
+  return { label: t('arenaLeaderboard.columns.averagePlacement'), value: metric.value.toFixed(2) }
+})
 const isSidePanel = computed(() => props.variant === 'side-panel')
 const championBlogUrl = computed(() => {
   return championBlogs.value[0]?.url || null
@@ -347,6 +357,19 @@ const logOverlayInfo = (message, details = {}) => {
     })
   } catch (err) {
     console.warn('Failed to send overlay diagnostic log:', err)
+  }
+}
+
+const loadArenaChampionStats = async (requestedChampionId) => {
+  try {
+    const result = await electronAPI.arenaLeaderboard?.getSnapshot()
+    if (!result?.success || !result.snapshot) {
+      arenaChampionStats.value = null
+      return
+    }
+    arenaChampionStats.value = result.snapshot.champions.find(row => row.championId === requestedChampionId) || null
+  } catch {
+    arenaChampionStats.value = null
   }
 }
 
@@ -655,6 +678,7 @@ const showOverlay = async (data) => {
       requestedChampionId,
       requestedLocale
     )
+    await loadArenaChampionStats(requestedChampionId)
 
     if (
       loadSequence !== championLoadSequence ||

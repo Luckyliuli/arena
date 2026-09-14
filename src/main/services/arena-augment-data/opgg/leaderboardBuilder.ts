@@ -122,6 +122,7 @@ export async function buildArenaLeaderboardSnapshot(
             slug: champion.slug,
             winRate: stats.winRate,
             pickRate: stats.pickRate,
+            averagePlacement: stats.averagePlacement,
           },
           synergies: parseArenaChampionSynergies(html).map(synergy => ({
             championIds: [champion.id, synergy.teammateChampionId],
@@ -152,7 +153,7 @@ export async function buildArenaLeaderboardSnapshot(
 
   return {
     snapshot: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       patch: options.patch,
       source: 'opgg',
       champions,

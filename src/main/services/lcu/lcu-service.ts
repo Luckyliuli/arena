@@ -24,12 +24,12 @@ import {
   LCUAuthConfig,
   LCUUrls,
   GameflowPhase,
-  ChampSelectAction,
   ChampSelectBenchChampion,
   ChampSelectSession,
   ChampSelectSnapshot,
   PerkPage,
 } from './types.ts'
+import { resolveSelfChampionId } from './champ-select-self.ts'
 
 const LCU_ENDPOINT_PROBE_TIMEOUT_MS = 2500
 const LCU_MATCH_HISTORY_TIMEOUT_MS = 10 * 1000
@@ -424,54 +424,6 @@ const normalizeBenchChampions = (
   return normalized
 }
 
-const getSelfChampionIdFromActions = (
-  actions: ChampSelectAction[][],
-  localPlayerCellId: number | null
-): number | null => {
-  if (localPlayerCellId == null || !Array.isArray(actions)) {
-    return null
-  }
-
-  for (const actionGroup of actions) {
-    if (!Array.isArray(actionGroup)) {
-      continue
-    }
-
-    for (const action of actionGroup) {
-      if (action.actorCellId !== localPlayerCellId) {
-        continue
-      }
-
-      const championId = toPositiveInteger(action.championId)
-      if (championId) {
-        return championId
-      }
-    }
-  }
-
-  return null
-}
-
-const getSelfChampionId = (session: ChampSelectSession): number | null => {
-  const localPlayerCellId = Number.isInteger(session.localPlayerCellId)
-    ? session.localPlayerCellId
-    : null
-
-  if (localPlayerCellId == null) {
-    return null
-  }
-
-  const localPlayer = Array.isArray(session.myTeam)
-    ? session.myTeam.find((member) => member.cellId === localPlayerCellId)
-    : null
-  const teamChampionId = toPositiveInteger(localPlayer?.championId)
-  if (teamChampionId) {
-    return teamChampionId
-  }
-
-  return getSelfChampionIdFromActions(session.actions || [], localPlayerCellId)
-}
-
 const buildChampSelectSnapshot = (
   params: {
     connected: boolean
@@ -520,7 +472,7 @@ const buildChampSelectSnapshot = (
     isInChampSelect: true,
     champSelectSession: session,
     localPlayerCellId,
-    selfChampionId: getSelfChampionId(session),
+    selfChampionId: resolveSelfChampionId(session),
     benchEnabled: session.benchEnabled === true || benchChampions.length > 0,
     benchChampions,
     myTeam: Array.isArray(session.myTeam) ? session.myTeam : [],

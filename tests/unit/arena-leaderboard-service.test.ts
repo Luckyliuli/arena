@@ -7,10 +7,10 @@ import type { ArenaLeaderboardSnapshot } from '../../src/shared/arena-leaderboar
 
 function snapshot(patch: string, winRate: number): ArenaLeaderboardSnapshot {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     patch,
     source: 'opgg',
-    champions: [{ championId: 1, slug: 'Annie', winRate, pickRate: 0.1 }],
+    champions: [{ championId: 1, slug: 'Annie', winRate, pickRate: 0.1, averagePlacement: 3.2 }],
     combinations: { trio: [], duo: [] },
   }
 }

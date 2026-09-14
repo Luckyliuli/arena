@@ -348,11 +348,41 @@ describe.sequential('automatic screenshot service lifecycle', () => {
       mode: 'items',
       championId: 429,
       items: expect.arrayContaining([
-        expect.objectContaining({ itemId: 443090, detectedSlot: 0, isTopPick: true }),
+        expect.objectContaining({ itemId: 443090, detectedSlot: 0, isTopPick: true, recommendScore: expect.any(Number), recommendationTier: expect.any(String) }),
         expect.objectContaining({ itemId: 443069, detectedSlot: 1 }),
         expect.objectContaining({ itemId: 443054, detectedSlot: 2 }),
       ]),
     }))
+  })
+
+  it('does not show the prismatic overlay for ordinary item selections', async () => {
+    const service = createRunningIdleService()
+    const fixture = readFileSync(fileURLToPath(new URL('../fixtures/opgg/arena-kalista-items.html', import.meta.url)), 'utf8')
+    service.arenaItemSource = opggItemSource({ fetcher: async () => fixture, defaultChampionSlug: 'Kalista' })
+    service.arenaItemDictionary = [
+      { itemId: 6632, name: '神圣分离者', iconUrl: null },
+      { itemId: 3193, name: '石像鬼石板甲', iconUrl: null },
+      { itemId: 3163, name: '巨型九头蛇', iconUrl: null },
+    ]
+    appStore.get.mockReturnValue(429)
+    const send = vi.fn()
+    mocks.windows.push({ isDestroyed: () => false, isVisible: () => false, hide: vi.fn(), webContents: { getURL: () => 'http://localhost/#/floating-overlay', send } })
+
+    const handled = await service._tryArenaItemSelection({
+      timestamp: Date.now(),
+      analysis: {
+        cardCount: 0,
+        augments: [],
+        slotDiagnostics: [
+          { slot: 0, text: '神圣分离者' },
+          { slot: 1, text: '石像鬼石板甲' },
+          { slot: 2, text: '巨型九头蛇' },
+        ],
+      },
+    })
+
+    expect(handled).toBe(false)
+    expect(send).not.toHaveBeenCalledWith('arena-item-detected', expect.anything())
   })
 
   it('recovers OP.GG-only augments that are absent from the CDragon dictionary', async () => {

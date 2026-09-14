@@ -29,20 +29,22 @@ const candidate = (
 })
 
 describe('arena augment recommendation score', () => {
-  it('uses the agreed weighted formula', () => {
-    const score = calculateArenaRecommendScore({
+  it('uses win-rate and pick-rate percentiles with sample confidence', () => {
+    const top = {
       augmentId: 1,
       averagePlacement: null,
       firstPlaceRate: null,
       pickRate: 0.2,
       winRate: 0.6,
       sampleSize: 500,
-    })
+    }
+    const bottom = { ...top, augmentId: 2, pickRate: 0.1, winRate: 0.5 }
 
-    expect(score).toBeCloseTo(0.5)
+    expect(calculateArenaRecommendScore(top, [top, bottom])).toBeCloseTo(0.95)
+    expect(calculateArenaRecommendScore(bottom, [top, bottom])).toBeCloseTo(0.05)
   })
 
-  it('caps the sample-size contribution at one', () => {
+  it('caps sample confidence at one', () => {
     const stat = {
       augmentId: 1,
       averagePlacement: null,
@@ -51,8 +53,8 @@ describe('arena augment recommendation score', () => {
       winRate: 0.6,
       sampleSize: 1000,
     }
-    expect(calculateArenaRecommendScore(stat)).toBeCloseTo(0.6)
-    expect(calculateArenaRecommendScore({ ...stat, sampleSize: 2000 })).toBeCloseTo(0.6)
+    expect(calculateArenaRecommendScore(stat, [stat])).toBeCloseTo(1)
+    expect(calculateArenaRecommendScore({ ...stat, sampleSize: 2000 }, [stat])).toBeCloseTo(1)
   })
 
   it('keeps null distinct from zero', () => {
@@ -65,18 +67,19 @@ describe('arena augment recommendation score', () => {
       sampleSize: 500,
     }
 
-    expect(calculateArenaRecommendScore({ ...base, winRate: null })).toBeNull()
-    expect(calculateArenaRecommendScore({ ...base, pickRate: null })).toBeNull()
-    expect(calculateArenaRecommendScore({ ...base, sampleSize: null })).toBeNull()
-    expect(calculateArenaRecommendScore({ ...base, pickRate: 0, sampleSize: 0 })).toBeCloseTo(0.36)
+    expect(calculateArenaRecommendScore({ ...base, winRate: null }, [base])).toBeNull()
+    expect(calculateArenaRecommendScore({ ...base, pickRate: null }, [base])).toBeNull()
+    expect(calculateArenaRecommendScore({ ...base, sampleSize: null }, [base])).toBeNull()
+    const zero = { ...base, pickRate: 0, sampleSize: 0 }
+    expect(calculateArenaRecommendScore(zero, [zero])).toBeCloseTo(0.9)
   })
 
   it('maps score thresholds to recommendation tiers', () => {
-    expect(getArenaRecommendationTier(0.6)).toBe('must-pick')
-    expect(getArenaRecommendationTier(0.5)).toBe('strong')
+    expect(getArenaRecommendationTier(0.8)).toBe('must-pick')
+    expect(getArenaRecommendationTier(0.6)).toBe('strong')
     expect(getArenaRecommendationTier(0.4)).toBe('recommended')
-    expect(getArenaRecommendationTier(0.3)).toBe('optional')
-    expect(getArenaRecommendationTier(0.2999)).toBe('niche')
+    expect(getArenaRecommendationTier(0.2)).toBe('optional')
+    expect(getArenaRecommendationTier(0.1999)).toBe('niche')
     expect(getArenaRecommendationTier(null)).toBeNull()
   })
 })

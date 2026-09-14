@@ -9,6 +9,7 @@ export type AppStoreKey =
   | 'championInsight.alwaysOnTop'
   | 'augments.showTopOverlay'
   | 'augments.showSidePanel'
+  | 'itemSets.autoApplyArena'
 
 export type SupportedDataLocale = 'zh-CN' | 'zh-TW' | 'en-US'
 
@@ -273,6 +274,8 @@ export interface ArenaOverlayItemPayload extends LooseRecord {
   pickRate?: number | null
   sampleSize?: number | null
   winRate?: number | null
+  recommendScore?: number | null
+  recommendationTier?: ArenaRecommendationTier | null
   dataAvailable?: boolean
   isTopPick?: boolean
 }

@@ -1,4 +1,6 @@
+import type { ArenaRecommendationTier } from '../../../shared/ipc-contract.ts'
 import type { ArenaItemPerfStat, ArenaItemRef } from './itemTypes.ts'
+import { buildArenaRecommendationScoreMap, getArenaRecommendationTier } from './recommendationScore.ts'
 
 export type ArenaItemRecommendationCandidate = {
   itemId: number | null
@@ -17,6 +19,8 @@ export type ArenaItemRecommendation = {
   pickRate: number | null
   sampleSize: number | null
   winRate: number | null
+  recommendScore: number | null
+  recommendationTier: ArenaRecommendationTier | null
   isTopPick: boolean
   dataAvailable: boolean
   missing: boolean
@@ -61,6 +65,7 @@ export function orderArenaItemRecommendations(rows: readonly ArenaItemPerfStat[]
 export function recommendArenaItemCandidates(
   candidates: readonly ArenaItemRecommendationCandidate[],
   rows: readonly ArenaItemPerfStat[],
+  scorePool: readonly ArenaItemPerfStat[] = rows,
 ): ArenaItemRecommendation[] {
   const orderedCandidates = candidates
     .map((candidate, inputIndex) => ({ candidate, inputIndex }))
@@ -70,6 +75,15 @@ export function recommendArenaItemCandidates(
     const itemId = itemIdOf(row)
     if (itemId != null && !rowById.has(itemId)) rowById.set(itemId, row)
   }
+  const scoreByItemId = buildArenaRecommendationScoreMap(scorePool.flatMap(row => {
+    const itemId = itemIdOf(row)
+    return itemId == null ? [] : [{
+      key: itemId,
+      winRate: row.winRate,
+      pickRate: row.pickRate,
+      sampleSize: row.sampleSize,
+    }]
+  }))
 
   const recommendations: ArenaItemRecommendation[] = orderedCandidates.map(({ candidate }) => {
     const rawId = finite(candidate.itemId)
@@ -77,6 +91,7 @@ export function recommendArenaItemCandidates(
     const row = itemId == null ? null : rowById.get(itemId) ?? null
     const statItem = row?.items?.[0] as ArenaItemRef | undefined
     const averagePlacement = row ? finite(row.averagePlacement) : null
+    const recommendScore = itemId == null ? null : scoreByItemId.get(itemId) ?? null
     return {
       itemId,
       detectedSlot: candidate.detectedSlot,
@@ -87,32 +102,17 @@ export function recommendArenaItemCandidates(
       pickRate: row ? finite(row.pickRate) : null,
       sampleSize: row ? finite(row.sampleSize) : null,
       winRate: row ? finite(row.winRate) : null,
+      recommendScore,
+      recommendationTier: getArenaRecommendationTier(recommendScore),
       isTopPick: false,
-      dataAvailable: averagePlacement != null,
+      dataAvailable: row != null && (recommendScore != null || averagePlacement != null),
       missing: itemId == null,
     }
   })
 
   const topCandidate = recommendations
-    .filter(row => !row.missing && row.averagePlacement != null)
-    .sort((left, right) => compareArenaItemStats(
-      {
-        items: [{ itemId: left.itemId ?? 0, name: left.name, iconUrl: left.iconUrl }],
-        averagePlacement: left.averagePlacement,
-        firstPlaceRate: left.firstPlaceRate,
-        pickRate: left.pickRate,
-        winRate: left.winRate,
-        sampleSize: left.sampleSize,
-      },
-      {
-        items: [{ itemId: right.itemId ?? 0, name: right.name, iconUrl: right.iconUrl }],
-        averagePlacement: right.averagePlacement,
-        firstPlaceRate: right.firstPlaceRate,
-        pickRate: right.pickRate,
-        winRate: right.winRate,
-        sampleSize: right.sampleSize,
-      },
-    ))[0]
+    .filter(row => !row.missing && row.recommendScore != null)
+    .sort((left, right) => (right.recommendScore ?? -1) - (left.recommendScore ?? -1))[0]
 
   if (topCandidate) topCandidate.isTopPick = true
   return recommendations

@@ -6,6 +6,7 @@
 export {
   ARENA_ITEM_CATEGORIES,
   emptyArenaItemCategories,
+  isArenaPrismaticItemId,
   type ArenaItemCategory,
   type ArenaItemCategories,
   type ArenaItemPerfStat,
@@ -62,3 +63,6 @@ export {
 } from './itemRecommendation.ts'
 
 export { matchArenaItemNames, matchArenaItemSlotTexts } from './itemMatcher.ts'
+
+export { buildArenaItemSet, type ArenaItemSet } from './arenaItemSet.ts'
+export { injectArenaItemSet, type ArenaItemSetSyncResult } from './arenaItemSetInjection.ts'

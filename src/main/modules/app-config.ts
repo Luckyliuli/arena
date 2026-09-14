@@ -45,6 +45,7 @@ import {
 } from './performance-monitor.ts'
 import { createAppTray } from './tray.ts'
 import {
+    shouldAutoApplyArenaItemSets,
     shouldShowChampionDetails,
     shouldShowAugmentSidePanel,
     shouldShowAugmentTopOverlay,
@@ -57,6 +58,7 @@ import {
     GAMEFLOW_IDLE_CAPTURE_INTERVAL_MS,
 } from '../auto-screenshot-policy.ts'
 import { readArenaSessionState } from '../services/arena-session/arena-session-service.ts'
+import { isArenaGameflowSession } from '../services/arena-session/arena-session-state.ts'
 import { shoppingPhaseSignalStore } from '../services/arena-session/shopping-phase-signal.ts'
 
 const __dirname = import.meta.dirname
@@ -115,6 +117,8 @@ let lastInProgressInsightChampionId = null
 let lastInProgressChampionRecoveryAttemptAt = 0
 let inProgressChampionRecoveryInFlight = false
 let champSelectSnapshotPollInFlight = false
+let arenaItemSetInjectionPromise = null
+let lastInjectedArenaItemSetChampionId = null
 
 /**
  * 初始化应用
@@ -648,6 +652,84 @@ function resetChampSelectItemSetState(reason) {
     logger.debug('[champ-select] insight state reset', { reason })
 }
 
+async function ensureArenaItemSetInjection(lcuService, championId, reason) {
+    if (!shouldAutoApplyArenaItemSets()) return false
+    if (!Number.isInteger(championId) || championId <= 0) return false
+    if (lastInjectedArenaItemSetChampionId === championId) return true
+    if (arenaItemSetInjectionPromise) return arenaItemSetInjectionPromise
+
+    arenaItemSetInjectionPromise = (async () => {
+        try {
+            const gameflowSession = await lcuService.getGameflowSession()
+            if (!isArenaGameflowSession(gameflowSession)) {
+                logger.debug('[arena-item-set] skipped non-Arena champ select', { championId, reason })
+                return false
+            }
+
+            const [
+                { fileOpggItemCache, injectArenaItemSet, opggItemSource },
+                { loadChampionName },
+                { getArenaAugmentCacheDir },
+            ] = await Promise.all([
+                import('../services/arena-augment-data/index.ts'),
+                import('../data-loader.ts'),
+                import('./app-paths.ts'),
+            ])
+            const source = opggItemSource({ cache: fileOpggItemCache(getArenaAugmentCacheDir()) })
+            const [bundle, championName] = await Promise.all([
+                source.getItemsForChampion(championId),
+                loadChampionName(championId),
+            ])
+            if (bundle.reason) {
+                logger.warn('[arena-item-set] recommendation data unavailable', {
+                    championId,
+                    reason: bundle.reason,
+                })
+                return false
+            }
+
+            const result = await injectArenaItemSet({
+                championId,
+                championName: championName?.nameCN || championName?.nameEN || String(championId),
+                loadCategories: async () => bundle.categories,
+                syncItemSet: itemSet => lcuService.syncItemSet(itemSet),
+            })
+            if (!result.success) {
+                logger.warn('[arena-item-set] injection failed', {
+                    championId,
+                    reason: result.reason || result.sync?.error || 'unknown',
+                })
+                return false
+            }
+
+            lastInjectedArenaItemSetChampionId = championId
+            logger.info('[arena-item-set] injected', {
+                championId,
+                reason,
+                blockCount: result.itemSet?.blocks.length || 0,
+            })
+            notifyAllWindows('item-set-auto-apply-completed', {
+                success: true,
+                championId,
+                itemSetCount: 1,
+                blocks: result.itemSet?.blocks.map(block => block.type) || [],
+                timestamp: Date.now(),
+            })
+            return true
+        } catch (error) {
+            logger.warn('[arena-item-set] injection error', {
+                championId,
+                reason,
+                error: error?.message || String(error),
+            })
+            return false
+        } finally {
+            arenaItemSetInjectionPromise = null
+        }
+    })()
+    return arenaItemSetInjectionPromise
+}
+
 async function showChampionInsightSnapshot(snapshot, reason) {
     const championId = normalizeChampionId(snapshot?.selfChampionId)
     setChampionMonitorChampion(championId)
@@ -707,6 +789,7 @@ async function pollChampSelectSnapshot(lcuService, reason, forceShow = false) {
 
         if (championChanged || shouldShowEmpty) {
             lastChampSelectInsightChampionId = championId
+            if (championChanged) void ensureArenaItemSetInjection(lcuService, championId, reason)
             await showChampionInsightSnapshot(snapshot, reason)
         }
     } catch (error) {
@@ -978,6 +1061,10 @@ async function initGameFlowMonitor() {
                 return
             }
 
+            if (phase === 'None' || phase === 'Lobby' || phase === 'EndOfGame') {
+                lastInjectedArenaItemSetChampionId = null
+            }
+
             if (phase !== GAMEFLOW_AUGMENT_ANALYSIS_PHASE) {
                 inProgressArenaVerdict = null
                 shoppingPhaseSignalStore.reset()
@@ -995,6 +1082,14 @@ async function initGameFlowMonitor() {
                 logger.info(`游戏阶段变化(${source}): ${prevPhase || 'unknown'} → ${phase}`)
                 notifyAllWindows('game-phase-changed', { phase: currentPhase, prevPhase })
                 clearAugmentOverlayForPhase(currentPhase)
+                if (currentPhase === 'GameStart') {
+                    const monitorState = getChampionMonitorState()
+                    void ensureArenaItemSetInjection(
+                        lcuService,
+                        monitorState.selectedChampionId || monitorState.lastChampionId,
+                        'game-start-retry',
+                    )
+                }
                 void logReadOnlyGameApiDiagnostics(lcuService, currentPhase, `phase-change:${source}`, true)
                 // 状态机只决定阶段入口效果，Electron/LCU 副作用仍由主进程执行。
                 switch (transition.entryEffect) {

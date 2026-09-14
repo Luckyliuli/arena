@@ -77,6 +77,7 @@ vi.mock('../../src/main/modules/user-preferences.ts', () => ({
   shouldShowChampionDetails: () => true,
   shouldShowAugmentTopOverlay: () => true,
   shouldShowAugmentSidePanel: () => true,
+  shouldAutoApplyArenaItemSets: () => false,
 }))
 
 beforeEach(() => {

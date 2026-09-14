@@ -3,6 +3,7 @@ import {
   orderArenaItemRecommendations,
   recommendArenaItemCandidates,
 } from '../../src/main/services/arena-augment-data/itemRecommendation.ts'
+import { isArenaPrismaticItemId } from '../../src/main/services/arena-augment-data/itemTypes.ts'
 
 const item = (itemId: number, averagePlacement: number | null, overrides: Record<string, unknown> = {}) => ({
   items: [{ itemId, name: `Item ${itemId}`, iconUrl: null }],
@@ -18,7 +19,7 @@ describe('recommendArenaItemCandidates', () => {
   it('aligns items to the three detected slots', () => {
     const result = recommendArenaItemCandidates(
       [{ itemId: 303, detectedSlot: 2 }, { itemId: 101, detectedSlot: 0 }, { itemId: 202, detectedSlot: 1 }],
-      [item(101, 3.2), item(202, 2.7), item(303, 3.8)],
+      [item(101, 3.2), item(202, 2.7, { winRate: 0.6, pickRate: 0.3, sampleSize: 1000 }), item(303, 3.8)],
     )
 
     expect(result.map(row => row.detectedSlot)).toEqual([0, 1, 2])
@@ -46,5 +47,14 @@ describe('recommendArenaItemCandidates', () => {
 
     expect(result[0]).toMatchObject({ itemId: 101, dataAvailable: true, isTopPick: true })
     expect(result[1]).toMatchObject({ itemId: 202, dataAvailable: false, missing: false, isTopPick: false })
+  })
+})
+
+describe('Arena prismatic item ids', () => {
+  it('distinguishes prismatic item ids from ordinary shop items', () => {
+    expect(isArenaPrismaticItemId(443054)).toBe(true)
+    expect(isArenaPrismaticItemId(447114)).toBe(true)
+    expect(isArenaPrismaticItemId(6632)).toBe(false)
+    expect(isArenaPrismaticItemId(223153)).toBe(false)
   })
 })

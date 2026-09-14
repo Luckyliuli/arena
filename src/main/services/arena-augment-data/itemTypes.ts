@@ -36,3 +36,8 @@ export function emptyArenaItemCategories(): ArenaItemCategories {
     final: [],
   }
 }
+
+export function isArenaPrismaticItemId(itemId: unknown): boolean {
+  const id = Number(itemId)
+  return Number.isInteger(id) && id >= 443000 && id < 448000
+}

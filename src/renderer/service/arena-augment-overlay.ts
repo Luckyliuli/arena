@@ -69,10 +69,10 @@ export function getArenaOverlayRecommendationTier(
 
   const score = getArenaOverlayRecommendationScore(augment)
   if (score == null) return null
-  if (score >= 0.6) return 'must-pick'
-  if (score >= 0.5) return 'strong'
+  if (score >= 0.8) return 'must-pick'
+  if (score >= 0.6) return 'strong'
   if (score >= 0.4) return 'recommended'
-  if (score >= 0.3) return 'optional'
+  if (score >= 0.2) return 'optional'
   return 'niche'
 }
 

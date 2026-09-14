@@ -103,10 +103,10 @@ describe('arena overlay recommendation helpers', () => {
 
   it('uses the declared tier and falls back to score bands', () => {
     expect(getArenaOverlayRecommendationTier({ recommendationTier: 'must-pick', recommendScore: 0.1 })).toBe('must-pick')
-    expect(getArenaOverlayRecommendationTier({ recommendScore: 0.62 })).toBe('must-pick')
-    expect(getArenaOverlayRecommendationTier({ recommendScore: 0.52 })).toBe('strong')
+    expect(getArenaOverlayRecommendationTier({ recommendScore: 0.82 })).toBe('must-pick')
+    expect(getArenaOverlayRecommendationTier({ recommendScore: 0.62 })).toBe('strong')
     expect(getArenaOverlayRecommendationTier({ recommendScore: 0.42 })).toBe('recommended')
-    expect(getArenaOverlayRecommendationTier({ recommendScore: 0.32 })).toBe('optional')
+    expect(getArenaOverlayRecommendationTier({ recommendScore: 0.22 })).toBe('optional')
     expect(getArenaOverlayRecommendationTier({ recommendScore: 0.12 })).toBe('niche')
     expect(getArenaOverlayRecommendationTier({ recommendScore: null })).toBeNull()
   })

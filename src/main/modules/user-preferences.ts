@@ -6,6 +6,7 @@ export const USER_PREFERENCE_KEYS = {
     championInsightAlwaysOnTop: 'championInsight.alwaysOnTop',
     showAugmentTopOverlay: 'augments.showTopOverlay',
     showAugmentSidePanel: 'augments.showSidePanel',
+    autoApplyArenaItemSets: 'itemSets.autoApplyArena',
 }
 
 const LEGACY_ALWAYS_ON_TOP_MIGRATION_KEY = 'migrations.championInsightAlwaysOnTopDefaultV1'
@@ -37,6 +38,10 @@ export function shouldShowAugmentTopOverlay(): boolean {
 
 export function shouldShowAugmentSidePanel(): boolean {
     return getBooleanPreference(USER_PREFERENCE_KEYS.showAugmentSidePanel, true)
+}
+
+export function shouldAutoApplyArenaItemSets(): boolean {
+    return getBooleanPreference(USER_PREFERENCE_KEYS.autoApplyArenaItemSets, true)
 }
 
 /**

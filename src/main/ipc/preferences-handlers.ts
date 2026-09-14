@@ -22,6 +22,7 @@ const RENDERER_STORE_KEYS = new Set<AppStoreKey>([
   'championInsight.alwaysOnTop',
   'augments.showTopOverlay',
   'augments.showSidePanel',
+  'itemSets.autoApplyArena',
 ])
 
 function assertRendererStoreKey(key: unknown): asserts key is AppStoreKey {

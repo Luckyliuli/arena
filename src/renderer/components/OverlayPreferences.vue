@@ -84,6 +84,13 @@ const preferenceDefinitions = [
     titleKey: 'preferences.sidePanelTitle',
     descriptionKey: 'preferences.sidePanelDescription',
   },
+  {
+    key: 'autoApplyArenaItemSets',
+    storeKey: 'itemSets.autoApplyArena',
+    defaultValue: true,
+    titleKey: 'preferences.arenaItemSetTitle',
+    descriptionKey: 'preferences.arenaItemSetDescription',
+  },
 ]
 
 const preferenceItems = computed(() => preferenceDefinitions.map(item => ({

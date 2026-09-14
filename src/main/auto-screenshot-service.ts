@@ -1495,7 +1495,7 @@ class AutoScreenshotService {
         }
 
         try {
-            const { matchArenaItemNames, recommendArenaItemCandidates } = await import('./services/arena-augment-data/index.ts')
+            const { isArenaPrismaticItemId, matchArenaItemNames, recommendArenaItemCandidates } = await import('./services/arena-augment-data/index.ts')
             const source = await this._getArenaItemSource()
             const [bundle, itemDictionary] = await Promise.all([
                 source.getItemsForChampion(championId),
@@ -1505,17 +1505,22 @@ class AutoScreenshotService {
                 logger.warn('[arena-item] source returned no records', { championId, reason: bundle.reason })
             }
             const candidates = matchArenaItemNames(slotTexts, itemDictionary)
-            if (candidates.length < 3) {
+            if (candidates.length < 3 || candidates.some(candidate => !isArenaPrismaticItemId(candidate.itemId))) {
                 logger.debug('[arena-item] OCR did not resolve three prismatic items', {
                     championId,
                     slotTexts: slotTexts.map(text => text.slice(0, 80)),
                     matchedCount: candidates.length,
+                    itemIds: candidates.map(candidate => candidate.itemId),
                 })
-                this._handleArenaItemMiss('item-match-incomplete')
+                this._handleArenaItemMiss('not-prismatic-selection')
                 return false
             }
 
-            const items = recommendArenaItemCandidates(candidates, Object.values(bundle.categories).flat())
+            const items = recommendArenaItemCandidates(
+                candidates,
+                bundle.categories.prismatic,
+                bundle.categories.prismatic,
+            )
             const currentIds = items.map(item => item.itemId).filter(Boolean)
             const changed = currentIds.join(',') !== this.lastDetectedArenaItemIds.join(',')
             this.arenaItemMissCount = 0

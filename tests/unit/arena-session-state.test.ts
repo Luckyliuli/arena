@@ -3,6 +3,7 @@ import {
   ARENA_GAME_MODE,
   ARENA_QUEUE_ID,
   deriveArenaSessionState,
+  isArenaGameflowSession,
   readArenaGameflowIdentity,
 } from '../../src/main/services/arena-session/arena-session-state.ts'
 
@@ -172,5 +173,12 @@ describe('deriveArenaSessionState', () => {
 
     expect(state.status).toBe('not-arena')
     expect(state.championId).toBeNull()
+  })
+})
+describe('isArenaGameflowSession', () => {
+  it('recognises queue id 1700 and CHERRY game mode', () => {
+    expect(isArenaGameflowSession({ gameData: { queue: { id: 1700 } } })).toBe(true)
+    expect(isArenaGameflowSession({ gameData: { queue: { gameMode: 'CHERRY' } } })).toBe(true)
+    expect(isArenaGameflowSession({ gameData: { queue: { id: 450 } } })).toBe(false)
   })
 })

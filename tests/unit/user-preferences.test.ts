@@ -8,6 +8,7 @@ vi.mock('../../src/main/modules/app-store.ts', () => ({
 
 import {
   migrateLegacyChampionInsightAlwaysOnTopPreference,
+  shouldAutoApplyArenaItemSets,
   shouldHideChampionInsightOnGameStart,
   shouldKeepChampionInsightOnTop,
   shouldShowChampionDetails,
@@ -38,6 +39,13 @@ describe('user preferences', () => {
     expect(mocks.get).toHaveBeenCalledWith('championInsight.hideOnGameStart')
     mocks.get.mockReturnValue(false)
     expect(shouldHideChampionInsightOnGameStart()).toBe(false)
+  })
+
+  it('enables Arena item-set injection by default and still honors explicit changes', () => {
+    expect(shouldAutoApplyArenaItemSets()).toBe(true)
+    expect(mocks.get).toHaveBeenCalledWith('itemSets.autoApplyArena')
+    mocks.get.mockReturnValue(false)
+    expect(shouldAutoApplyArenaItemSets()).toBe(false)
   })
 
   it('enables always-on-top by default and still honors explicit changes', () => {

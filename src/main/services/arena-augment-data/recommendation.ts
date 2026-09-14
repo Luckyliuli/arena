@@ -1,5 +1,9 @@
 import type { ArenaRecommendationTier } from '../../../shared/ipc-contract.ts'
 import type { AugmentPerfStat, AugmentStatsBundle } from './interface.ts'
+import {
+  buildArenaRecommendationScoreMap,
+  getArenaRecommendationTier,
+} from './recommendationScore.ts'
 
 // The tier vocabulary travels to the renderer inside the IPC payload, so the
 // contract owns the single definition and this module re-exports it.
@@ -64,31 +68,34 @@ function isSampleSize(value: number | null): value is number {
   return value != null && Number.isFinite(value) && value >= 0
 }
 
-export function calculateArenaRecommendScore(stat: AugmentPerfStat | null | undefined): number | null {
-  if (!stat || !isProbability(stat.winRate) || !isProbability(stat.pickRate) || !isSampleSize(stat.sampleSize)) {
-    return null
-  }
-
-  const sampleContribution = Math.min(stat.sampleSize / 1000, 1)
-  return stat.winRate * 0.6 + stat.pickRate * 0.2 + sampleContribution * 0.2
+export function calculateArenaRecommendScore(
+  stat: AugmentPerfStat | null | undefined,
+  pool: readonly AugmentPerfStat[] = stat ? [stat] : [],
+): number | null {
+  if (!stat || !Number.isInteger(stat.augmentId) || stat.augmentId <= 0) return null
+  if (!isProbability(stat.winRate) || !isProbability(stat.pickRate) || !isSampleSize(stat.sampleSize)) return null
+  const scoreMap = buildArenaRecommendationScoreMap(pool.map(record => ({
+    key: record.augmentId,
+    winRate: record.winRate,
+    pickRate: record.pickRate,
+    sampleSize: record.sampleSize,
+  })))
+  return scoreMap.get(stat.augmentId) ?? null
 }
 
-export function getArenaRecommendationTier(score: number | null): ArenaRecommendationTier | null {
-  if (score == null || !Number.isFinite(score)) {
-    return null
-  }
-  if (score >= 0.6) return 'must-pick'
-  if (score >= 0.5) return 'strong'
-  if (score >= 0.4) return 'recommended'
-  if (score >= 0.3) return 'optional'
-  return 'niche'
-}
+export { getArenaRecommendationTier }
 
 export function recommendArenaAugmentCandidates(
   candidates: readonly ArenaRecommendationCandidate[],
   bundle: AugmentStatsBundle,
 ): ArenaAugmentRecommendationSet {
   const statById = new Map(bundle.records.map(record => [record.augmentId, record]))
+  const scoreByAugmentId = buildArenaRecommendationScoreMap(bundle.records.map(record => ({
+    key: record.augmentId,
+    winRate: record.winRate,
+    pickRate: record.pickRate,
+    sampleSize: record.sampleSize,
+  })))
   const orderedCandidates = candidates
     .map((candidate, inputIndex) => ({ candidate, inputIndex }))
     .sort((left, right) => {
@@ -103,7 +110,7 @@ export function recommendArenaAugmentCandidates(
     const isSpecialOption = augmentId != null && candidate.rarity === 'unknown'
     const stat = augmentId == null || isSpecialOption ? null : statById.get(augmentId) ?? null
     const notRecommendedForChampion = augmentId != null && !isSpecialOption && stat == null
-    const recommendScore = calculateArenaRecommendScore(stat)
+    const recommendScore = stat ? scoreByAugmentId.get(stat.augmentId) ?? null : null
 
     return {
       augmentId,
