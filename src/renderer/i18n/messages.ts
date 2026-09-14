@@ -17,6 +17,9 @@ export const messages = {
     arenaLeaderboard: {
       title: '强化符文榜单',
       selectChampion: '选择英雄',
+      tabs: { augments: '符文榜', champions: '英雄榜', combinations: '组合榜' },
+      combinationTabs: { trio: '三人组合', duo: '双人组合' },
+      columns: { rank: '排名', augment: '符文', rarity: '稀有度', champion: '英雄', combination: '组合', winRate: '胜率', pickRate: '选用率', games: '场次', averagePlacement: '平均名次', firstPlace: '第一名率' },
       mockWarning: '当前数据为占位 (mock) 随机生成，仅供界面验证',
       source: '数据源',
       rankPlacement: '按平均名次',
@@ -413,6 +416,9 @@ export const messages = {
     arenaLeaderboard: {
       title: 'Augment Leaderboard',
       selectChampion: 'Champion',
+      tabs: { augments: 'Augments', champions: 'Champions', combinations: 'Combinations' },
+      combinationTabs: { trio: 'Three-player', duo: 'Two-player' },
+      columns: { rank: '#', augment: 'Augment', rarity: 'Rarity', champion: 'Champion', combination: 'Combination', winRate: 'Win rate', pickRate: 'Pick rate', games: 'Games', averagePlacement: 'Avg place', firstPlace: 'First place' },
       mockWarning: 'Mock data is currently shown — values are randomized placeholders, not real stats.',
       source: 'Source',
       rankPlacement: 'Avg placement',
@@ -482,6 +488,9 @@ export const messages = {
     arenaLeaderboard: {
       title: '強化符文榜單',
       selectChampion: '選擇英雄',
+      tabs: { augments: '符文榜', champions: '英雄榜', combinations: '組合榜' },
+      combinationTabs: { trio: '三人組合', duo: '雙人組合' },
+      columns: { rank: '排名', augment: '符文', rarity: '稀有度', champion: '英雄', combination: '組合', winRate: '勝率', pickRate: '選用率', games: '場次', averagePlacement: '平均名次', firstPlace: '第一名率' },
       mockWarning: '當前資料為佔位 (mock) 隨機生成，僅供介面驗證',
       source: '資料來源',
       rankPlacement: '按平均名次',

@@ -87,4 +87,10 @@ describe('resource path resolution', () => {
     expect(found).not.toBeNull()
     expect(fs.existsSync(found as string)).toBe(true)
   })
+
+  it('resolves the Arena leaderboard snapshot the same way', () => {
+    const found = findResourceFile(path.join('resources', 'arena-leaderboard-snapshot.json'))
+    expect(found).not.toBeNull()
+    expect(fs.existsSync(found as string)).toBe(true)
+  })
 })

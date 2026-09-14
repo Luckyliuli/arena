@@ -3,6 +3,7 @@ import type {
   ArenaAugmentStatsRequest,
   ArenaAugmentStatsResult,
   ArenaChampionOptionsResult,
+  ArenaLeaderboardSnapshotResult,
   ArenaItemStatsRequest,
   ArenaItemStatsResult,
   ElectronAPI,
@@ -27,6 +28,7 @@ const validEvents = new Set<ElectronEventChannel>([
   'augment-cleared',
   'arena-item-detected',
   'arena-item-cleared',
+  'arena-leaderboard-updated',
   'game-ended',
   'end-of-game',
   'quit-confirm-requested',
@@ -154,6 +156,10 @@ const electronAPI: ElectronAPI = {
   arenaItemData: {
     getStats: (request: ArenaItemStatsRequest): Promise<ArenaItemStatsResult> =>
       ipcRenderer.invoke('arena-item:get-stats', request),
+  },
+  arenaLeaderboard: {
+    getSnapshot: (): Promise<ArenaLeaderboardSnapshotResult> =>
+      ipcRenderer.invoke('arena-leaderboard:get-snapshot'),
   },
   events: { on, once },
 }

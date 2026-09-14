@@ -16,6 +16,7 @@ import {
     getFloatingWindow,
     getMainWindow,
     getPopupWindow,
+    notifyAllWindows,
     raiseOverlayWindow,
 } from './window-manager.ts'
 import logger from './logger.ts'
@@ -61,6 +62,38 @@ const BROADCAST_CHANNELS = new Set([
     'locale-changed',
 ])
 const championDataLoadRequests = new Map<string, Promise<unknown>>()
+let arenaLeaderboardServicePromise: Promise<ReturnType<typeof import('../services/arena-augment-data/opgg/leaderboardService.ts').createArenaLeaderboardService>> | null = null
+
+async function getArenaLeaderboardService() {
+    if (!arenaLeaderboardServicePromise) {
+        arenaLeaderboardServicePromise = (async () => {
+            const [
+                { createArenaLeaderboardService },
+                { fetchLiveArenaLeaderboardSnapshot },
+                { loadArenaLeaderboardSnapshot },
+                { getArenaAugmentCacheDir },
+            ] = await Promise.all([
+                import('../services/arena-augment-data/opgg/leaderboardService.ts'),
+                import('../services/arena-augment-data/opgg/leaderboardBuilder.ts'),
+                import('../../shared/arena-leaderboard-snapshot.ts'),
+                import('./app-paths.ts'),
+            ])
+            return createArenaLeaderboardService({
+                bundled: loadArenaLeaderboardSnapshot(),
+                cacheFile: path.join(getArenaAugmentCacheDir(), 'arena-leaderboard-snapshot.json'),
+                refresh: async () => {
+                    const result = await fetchLiveArenaLeaderboardSnapshot()
+                    for (const warning of result.warnings) {
+                        logger.warn('[arena-leaderboard] refresh warning:', warning)
+                    }
+                    return result.snapshot
+                },
+                onUpdated: snapshot => notifyAllWindows('arena-leaderboard-updated', snapshot),
+            })
+        })()
+    }
+    return arenaLeaderboardServicePromise
+}
 
 function getElapsedMs(startedAt: number): number {
     return Date.now() - startedAt
@@ -1045,6 +1078,22 @@ export function registerIpcHandlers(_isDev: boolean): void {
             }
         } catch (error) {
             logger.error('[arena-augment] champion options failed:', error)
+            return {
+                success: false,
+                error: getErrorMessage(error),
+            }
+        }
+    })
+
+    ipcMain.handle('arena-leaderboard:get-snapshot', async () => {
+        try {
+            const service = await getArenaLeaderboardService()
+            return {
+                success: true,
+                snapshot: await service.getSnapshot(),
+            }
+        } catch (error) {
+            logger.error('[arena-leaderboard] snapshot failed:', error)
             return {
                 success: false,
                 error: getErrorMessage(error),

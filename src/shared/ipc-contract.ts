@@ -1,3 +1,5 @@
+import type { ArenaLeaderboardSnapshot } from './arena-leaderboard-snapshot.ts'
+
 export type Unsubscribe = () => void
 
 export type AppStoreKey =
@@ -387,6 +389,10 @@ export interface ArenaChampionOptionsResult extends OperationResult {
   champions?: ArenaChampionOption[]
 }
 
+export interface ArenaLeaderboardSnapshotResult extends OperationResult {
+  snapshot?: ArenaLeaderboardSnapshot
+}
+
 export type ArenaItemCategory = 'prismatic' | 'core' | 'boots' | 'starting' | 'final'
 
 export type ArenaItemRef = {
@@ -438,6 +444,7 @@ export interface ElectronEventMap {
   'augment-cleared': [payload?: LooseRecord]
   'arena-item-detected': [payload: OverlayPayload]
   'arena-item-cleared': [payload?: LooseRecord]
+  'arena-leaderboard-updated': [payload: ArenaLeaderboardSnapshot]
   'game-ended': [payload?: LooseRecord]
   'end-of-game': [payload?: LooseRecord]
   'quit-confirm-requested': []
@@ -528,6 +535,9 @@ export interface ElectronAPI {
   }
   arenaItemData: {
     getStats(request: ArenaItemStatsRequest): Promise<ArenaItemStatsResult>
+  }
+  arenaLeaderboard: {
+    getSnapshot(): Promise<ArenaLeaderboardSnapshotResult>
   }
   events: {
     on<K extends ElectronEventChannel>(

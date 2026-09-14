@@ -16,6 +16,8 @@
     "fetch:arena-champions:check": "node scripts/fetch-arena-champions.mjs --check",
     "fetch:arena-items": "node scripts/fetch-arena-items.mjs",
     "fetch:arena-items:check": "node scripts/fetch-arena-items.mjs --check",
+    "fetch:arena-leaderboard": "node scripts/fetch-arena-leaderboard-snapshot.mjs",
+    "fetch:arena-leaderboard:check": "node scripts/fetch-arena-leaderboard-snapshot.mjs --check",
     "pack": "node scripts/pack-electron.mjs",
     "lint": "eslint src --ext .js,.ts,.vue",
     "type-check": "vue-tsc -p tsconfig.renderer.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
@@ -89,6 +91,10 @@
       {
         "from": "resources/items-arena.json",
         "to": "items-arena.json"
+      },
+      {
+        "from": "resources/arena-leaderboard-snapshot.json",
+        "to": "arena-leaderboard-snapshot.json"
       }
     ],
     "win": {

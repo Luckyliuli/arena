@@ -3,388 +3,208 @@
     <header class="card-header">
       <BarChart3 class="card-icon" />
       <h3>{{ t('arenaLeaderboard.title') }}</h3>
-      <label class="champion-picker">
+      <label v-if="activeTab === 'augments'" class="champion-picker">
         <span class="sr-only">{{ t('arenaLeaderboard.selectChampion') }}</span>
         <select
           v-model.number="championId"
           :aria-label="t('arenaLeaderboard.selectChampion')"
-          :disabled="loading || championOptions.length === 0"
-          @change="reload"
+          :disabled="augmentLoading || championOptions.length === 0"
+          @change="loadAugments"
         >
-          <option v-for="option in championOptions" :key="option.id" :value="option.id">
-            {{ championLabel(option) }}
-          </option>
+          <option v-for="option in championOptions" :key="option.id" :value="option.id">{{ championLabel(option) }}</option>
         </select>
       </label>
       <div class="card-actions">
-        <button class="reload-btn" type="button" :disabled="loading" :title="t('common.refresh')" @click="reload">
-          <RefreshCw :class="{ spinning: loading }" />
+        <button class="reload-btn" type="button" :disabled="currentLoading" :title="t('common.refresh')" @click="refreshCurrent">
+          <RefreshCw :class="{ spinning: currentLoading }" />
         </button>
       </div>
     </header>
 
-    <div v-if="bundle && bundle.mock" class="mock-banner">
-      <AlertTriangle class="banner-icon" />
-      <span>{{ t('arenaLeaderboard.mockWarning') }}</span>
-    </div>
+    <nav class="leaderboard-tabs" role="tablist" :aria-label="t('arenaLeaderboard.title')">
+      <button data-leaderboard-tab="augments" type="button" :class="{ active: activeTab === 'augments' }" @click="switchTab('augments')">{{ t('arenaLeaderboard.tabs.augments') }}</button>
+      <button data-leaderboard-tab="champions" type="button" :class="{ active: activeTab === 'champions' }" @click="switchTab('champions')">{{ t('arenaLeaderboard.tabs.champions') }}</button>
+      <button data-leaderboard-tab="combinations" type="button" :class="{ active: activeTab === 'combinations' }" @click="switchTab('combinations')">{{ t('arenaLeaderboard.tabs.combinations') }}</button>
+    </nav>
 
-    <div v-if="error" class="error-banner">{{ error }}</div>
-    <div v-else-if="loading" class="loading-line">{{ t('common.loading') }}</div>
-
-    <div class="rank-tabs">
-      <button v-for="opt in rankOptions" :key="opt.id" type="button" :class="{ active: currentRank === opt.id }" @click="currentRank = opt.id">
-        {{ t(opt.titleKey) }}
-      </button>
-    </div>
-
-    <div class="meta-line">
-      <span class="meta-source">{{ t('arenaLeaderboard.source') }}: {{ sourceLabel }}</span>
-      <span v-if="bundle" class="meta-count">{{ rows.length }} / {{ bundle.records.length }}</span>
-    </div>
-
-    <table class="leaderboard-table">
-      <thead>
-        <tr>
-          <th class="rank-col">#</th>
-          <th class="name-col">{{ t('arenaLeaderboard.name') }}</th>
-          <th class="rarity-col">{{ t('arenaLeaderboard.rarity') }}</th>
-          <th class="metric-col">{{ currentRankLabel }}</th>
-          <th v-if="!bundle || !bundle.mock" class="sample-col">{{ t('arenaLeaderboard.sampleSize') }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(row, idx) in rows" :key="row.augmentId">
-          <td class="rank-col">{{ idx + 1 }}</td>
-          <td class="name-col">
-            <div class="augment-name-cell">
-              <img
-                v-if="row.iconLarge || row.iconSmall"
-                :src="getAugmentIconUrl(row.iconLarge || row.iconSmall)"
-                :alt="row.displayName.zh || row.displayName.en"
-                class="leaderboard-augment-icon"
-                loading="lazy"
-              />
-              <span class="augment-name">{{ row.displayName.zh || row.displayName.en }}</span>
-            </div>
-          </td>
-          <td class="rarity-col">
-            <span class="rarity-badge" :class="rarityClass(row.rarity)">{{ rarityLabel(row.rarity) }}</span>
-          </td>
-          <td class="metric-col">{{ formatPrimary(row) }}</td>
-          <td v-if="!bundle || !bundle.mock" class="sample-col">{{ row.sampleSize == null ? "-" : row.sampleSize.toLocaleString() }}</td>
-        </tr>
-        <tr v-if="!loading && rows.length === 0">
-          <td class="empty-row" :colspan="(bundle && bundle.mock) ? 4 : 5">{{ emptyMessage }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div v-if="!hasApi" class="error-banner">{{ t('arenaLeaderboard.apiUnavailable') }}</div>
+    <ArenaAugmentLeaderboard
+      v-else-if="activeTab === 'augments'"
+      :rows="sortedAugments"
+      :loading="augmentLoading"
+      :error="augmentError"
+      :source-label="sourceLabel"
+      :sort-key="sortKey"
+      :sort-direction="sortDirection"
+      @sort="toggleSort"
+    />
+    <ArenaChampionLeaderboard
+      v-else-if="activeTab === 'champions'"
+      :rows="snapshot?.champions || []"
+      :champion-options="championOptions"
+      :loading="snapshotLoading"
+      :error="snapshotError"
+      @select-champion="selectChampionFromHero"
+    />
+    <ArenaCombinationLeaderboard
+      v-else
+      :combinations="snapshot?.combinations || { trio: [], duo: [] }"
+      :champion-options="championOptions"
+      :loading="snapshotLoading"
+      :error="snapshotError"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { AlertTriangle, BarChart3, RefreshCw } from 'lucide-vue-next'
-import { electronAPI, hasElectronAPI } from '../native/electron-api.ts'
-import { getAugmentIconUrl } from '../service/cdn'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { BarChart3, RefreshCw } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import { electronAPI, hasElectronAPI } from '../native/electron-api.ts'
 import type {
-  ArenaChampionOption,
   ArenaAugmentLeaderboardRow,
-  ArenaAugmentRankOrder,
-  ArenaAugmentRarity,
-  ArenaAugmentStatsBundle,
   ArenaAugmentStatsRequest,
   ArenaAugmentStatsResult,
+  ArenaChampionOption,
 } from '../../shared/ipc-contract.ts'
+import type { ArenaLeaderboardSnapshot } from '../../shared/arena-leaderboard-snapshot.ts'
+import {
+  sortArenaAugmentRows,
+  type ArenaAugmentSortKey,
+  type ArenaLeaderboardSortDirection,
+} from '../../shared/arena-leaderboard.ts'
+import ArenaAugmentLeaderboard from './ArenaAugmentLeaderboard.vue'
+import ArenaChampionLeaderboard from './ArenaChampionLeaderboard.vue'
+import ArenaCombinationLeaderboard from './ArenaCombinationLeaderboard.vue'
 
-const { t, locale } = useI18n()
+type LeaderboardTab = 'augments' | 'champions' | 'combinations'
 const DEFAULT_CHAMPION_ID = 1
-const DEFAULT_LIMIT = 20
-
-// OP.GG publishes only pick_rate / win_rate / play per augment: it has no
-// average placement or first-place rate at augment granularity, so those
-// two tabs could only ever render a column of dashes. Expose just the
-// dimensions the current source can fill; restore the other two here if a
-// placement-capable source lands behind the same adapter seam.
-const rankOptions: { id: ArenaAugmentRankOrder, titleKey: string }[] = [
-  { id: 'picks', titleKey: 'arenaLeaderboard.rankPicks' },
-  { id: 'winrate', titleKey: 'arenaLeaderboard.rankWinrate' },
-]
-
-const RANK_TITLE_KEYS: Record<ArenaAugmentRankOrder, string> = {
-  placement: 'arenaLeaderboard.metricPlacement',
-  firstplace: 'arenaLeaderboard.metricFirstplace',
-  picks: 'arenaLeaderboard.metricPicks',
-  winrate: 'arenaLeaderboard.metricWinrate',
-}
-
-const RARITY_LABEL_KEYS: Record<ArenaAugmentRarity, string> = {
-  silver: 'arenaLeaderboard.raritySilver',
-  gold: 'arenaLeaderboard.rarityGold',
-  prismatic: 'arenaLeaderboard.rarityPrismatic',
-  unknown: 'arenaLeaderboard.rarityUnknown',
-}
-
-const bundle = ref<ArenaAugmentStatsBundle | null>(null)
-const ranked = ref<Record<ArenaAugmentRankOrder, ArenaAugmentLeaderboardRow[]>>({
-  placement: [],
-  firstplace: [],
-  picks: [],
-  winrate: [],
-})
-const sourceLabel = ref<string>('')
+const AUGMENT_LIMIT = 100
+const { t, locale } = useI18n()
+const hasApi = hasElectronAPI()
+const activeTab = ref<LeaderboardTab>('augments')
 const championOptions = ref<ArenaChampionOption[]>([])
-const loading = ref<boolean>(false)
-const error = ref<string | null>(null)
-const championId = ref<number>(DEFAULT_CHAMPION_ID)
-const currentRank = ref<ArenaAugmentRankOrder>('picks')
+const championId = ref(DEFAULT_CHAMPION_ID)
+const augmentRows = ref<ArenaAugmentLeaderboardRow[]>([])
+const augmentLoading = ref(false)
+const augmentError = ref<string | null>(null)
+const sourceLabel = ref('')
+const sortKey = ref<ArenaAugmentSortKey>('winRate')
+const sortDirection = ref<ArenaLeaderboardSortDirection>('desc')
+const snapshot = ref<ArenaLeaderboardSnapshot | null>(null)
+const snapshotLoading = ref(false)
+const snapshotError = ref<string | null>(null)
+let unsubscribeSnapshot = () => {}
 
-const rows = computed<ArenaAugmentLeaderboardRow[]>(() => ranked.value[currentRank.value] || [])
-const currentRankLabel = computed<string>(() => t(RANK_TITLE_KEYS[currentRank.value]))
-const championLabel = (option: ArenaChampionOption) =>
-  locale.value === 'en-US' ? option.nameEn : option.nameZh
+const sortedAugments = computed(() => sortArenaAugmentRows(augmentRows.value, sortKey.value, sortDirection.value))
+const currentLoading = computed(() => activeTab.value === 'augments' ? augmentLoading.value : snapshotLoading.value)
+const championLabel = (option: ArenaChampionOption) => locale.value === 'en-US' ? option.nameEn : option.nameZh
 
-// When the source returns nothing it also tells us why. Surface that
-// instead of a generic "no data" — 'page-shape-changed' in particular
-// means OP.GG moved their markup and the scraper needs updating.
-const REASON_KEYS: Record<string, string> = {
-  'unknown-champion': 'arenaLeaderboard.reasonUnknownChampion',
-  'fetch-failed': 'arenaLeaderboard.reasonFetchFailed',
-  'page-shape-changed': 'arenaLeaderboard.reasonPageShapeChanged',
-  'no-records-after-join': 'arenaLeaderboard.reasonNoRecordsAfterJoin',
-}
-const emptyMessage = computed<string>(() => {
-  const reason = bundle.value?.reason
-  if (reason && REASON_KEYS[reason]) return t(REASON_KEYS[reason])
-  return t('arenaLeaderboard.empty')
-})
-
-function rarityClass(rarity: ArenaAugmentRarity): string {
-  return 'rarity-' + rarity
-}
-function rarityLabel(rarity: ArenaAugmentRarity): string {
-  return t(RARITY_LABEL_KEYS[rarity]);
-}
-
-function formatPrimary(row: ArenaAugmentLeaderboardRow): string {
-  switch (currentRank.value) {
-    case 'placement':
-      return row.averagePlacement == null ? '-' : row.averagePlacement.toFixed(2);
-    case 'firstplace':
-      return row.firstPlaceRate == null ? '-' : (row.firstPlaceRate * 100).toFixed(1) + '%';
-    case 'picks':
-      return row.pickRate == null ? '-' : (row.pickRate * 100).toFixed(1) + '%';
-    case 'winrate':
-      return row.winRate == null ? '-' : (row.winRate * 100).toFixed(1) + '%';
+function toggleSort(key: ArenaAugmentSortKey) {
+  if (sortKey.value === key) {
+    sortDirection.value = sortDirection.value === 'desc' ? 'asc' : 'desc'
+  } else {
+    sortKey.value = key
+    sortDirection.value = 'desc'
   }
 }
 
-async function reload(): Promise<void> {
-  if (!hasElectronAPI()) {
-    error.value = t('arenaLeaderboard.apiUnavailable');
-    return;
-  }
-  loading.value = true;
-  error.value = null;
+async function loadAugments() {
+  if (!hasApi) return
+  augmentLoading.value = true
+  augmentError.value = null
   try {
-    const request: ArenaAugmentStatsRequest = { championId: championId.value, limit: DEFAULT_LIMIT };
-    const result: ArenaAugmentStatsResult = await electronAPI.arenaAugmentData.getStats(request);
-    if (!result.success || !result.bundle || !result.ranked) {
-      throw new Error(result.error || t('arenaLeaderboard.loadFailed'));
-    }
-    bundle.value = result.bundle;
-    ranked.value = result.ranked;
-    sourceLabel.value = result.sourceLabel || result.bundle.source;
-  } catch (err) {
-    error.value = (err as Error).message || String(err);
+    const request: ArenaAugmentStatsRequest = { championId: championId.value, limit: AUGMENT_LIMIT }
+    const result: ArenaAugmentStatsResult = await electronAPI.arenaAugmentData.getStats(request)
+    if (!result.success || !result.ranked) throw new Error(result.error || t('arenaLeaderboard.loadFailed'))
+    augmentRows.value = result.ranked.winrate
+    sourceLabel.value = result.sourceLabel || result.bundle?.source || 'OP.GG'
+  } catch (error) {
+    augmentError.value = (error as Error).message || String(error)
   } finally {
-    loading.value = false;
+    augmentLoading.value = false
   }
 }
 
-async function initialize(): Promise<void> {
-  if (!hasElectronAPI()) {
-    error.value = t('arenaLeaderboard.apiUnavailable')
-    return
+async function loadSnapshot() {
+  if (!hasApi) return
+  snapshotLoading.value = true
+  snapshotError.value = null
+  try {
+    const result = await electronAPI.arenaLeaderboard.getSnapshot()
+    if (!result.success || !result.snapshot) throw new Error(result.error || t('arenaLeaderboard.loadFailed'))
+    snapshot.value = result.snapshot
+  } catch (error) {
+    snapshotError.value = (error as Error).message || String(error)
+  } finally {
+    snapshotLoading.value = false
   }
+}
 
+function refreshCurrent() {
+  if (activeTab.value === 'augments') void loadAugments()
+  else void loadSnapshot()
+}
+
+function switchTab(tab: LeaderboardTab) {
+  activeTab.value = tab
+  if (tab !== 'augments' && !snapshot.value) void loadSnapshot()
+}
+
+function selectChampionFromHero(nextChampionId: number) {
+  championId.value = nextChampionId
+  activeTab.value = 'augments'
+  void loadAugments()
+}
+
+async function initialize() {
+  if (!hasApi) return
   try {
     const result = await electronAPI.arenaAugmentData.getChampions()
     if (result.success && result.champions?.length) {
       championOptions.value = result.champions
       const savedChampionId = Number(await electronAPI.store.get('lastSelectedChampionId'))
-      if (championOptions.value.some(option => option.id === savedChampionId)) {
-        championId.value = savedChampionId
-      } else {
-        championId.value = championOptions.value[0].id
-      }
+      championId.value = championOptions.value.some(option => option.id === savedChampionId)
+        ? savedChampionId
+        : championOptions.value[0].id
     }
   } catch {
-    // The stats request below still surfaces its own error if the bridge is down.
+    // The augment request below remains usable with its default champion.
   }
 
-  await reload()
+  await Promise.all([loadAugments(), loadSnapshot()])
 }
 
-onMounted(() => { void initialize(); });
+onMounted(() => {
+  if (!hasApi) return
+  unsubscribeSnapshot = electronAPI.events.on('arena-leaderboard-updated', nextSnapshot => {
+    snapshot.value = nextSnapshot
+    snapshotError.value = null
+  })
+  void initialize()
+})
+onBeforeUnmount(() => unsubscribeSnapshot())
 </script>
 
 <style scoped>
-.leaderboard-card {
-    background: var(--hex-bg-elevated, #1f2330);
-    border: 1px solid var(--hex-border, #2c3140);
-    border-radius: 8px;
-    padding: 16px;
-    color: var(--hex-fg, #e6e8ee);
-    font-size: 13px;
-}
-.card-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-}
-.card-header h3 {
-    margin: 0;
-    flex: 1;
-    font-size: 15px;
-    font-weight: 600;
-}
-.champion-picker { min-width: 112px; max-width: 150px; }
-.champion-picker select {
-    width: 100%;
-    height: 28px;
-    padding: 0 26px 0 8px;
-    border: 1px solid var(--hex-border, #2c3140);
-    border-radius: 4px;
-    background: var(--hex-bg, #171a22);
-    color: var(--hex-fg, #e6e8ee);
-    font: inherit;
-    font-size: 12px;
-    cursor: pointer;
-}
-.champion-picker select:disabled { opacity: .55; cursor: wait; }
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-}
-.card-icon { color: var(--hex-accent, #5e8ad4); width: 18px; height: 18px; }
-.card-actions .reload-btn {
-    background: transparent;
-    border: 1px solid var(--hex-border, #2c3140);
-    color: var(--hex-fg, #e6e8ee);
-    border-radius: 4px;
-    padding: 4px 6px;
-    cursor: pointer;
-}
-.card-actions .reload-btn:disabled { opacity: 0.5; cursor: wait; }
+.leaderboard-card { background: var(--hex-bg-elevated, #1f2330); border: 1px solid var(--hex-border, #2c3140); border-radius: 8px; padding: 14px; color: var(--hex-fg, #e6e8ee); font-size: 13px; min-width: 0; }
+.card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.card-header h3 { margin: 0; flex: 1; font-size: 15px; font-weight: 700; }
+.card-icon { width: 18px; height: 18px; color: var(--hex-accent, #5e8ad4); }
+.card-actions .reload-btn { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--hex-border, #2c3140); border-radius: 4px; background: transparent; color: var(--hex-fg, #e6e8ee); cursor: pointer; }
+.card-actions .reload-btn:disabled { opacity: .55; cursor: wait; }
+.reload-btn svg { width: 14px; height: 14px; }
 .spinning { animation: spin 1s linear infinite; }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-.mock-banner {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(220, 170, 60, 0.12);
-    border: 1px solid rgba(220, 170, 60, 0.35);
-    color: #dca63c;
-    padding: 6px 10px;
-    border-radius: 4px;
-    font-size: 12px;
-    margin-bottom: 10px;
-}
-.banner-icon { width: 14px; height: 14px; }
-
-.error-banner {
-    background: rgba(220, 80, 80, 0.12);
-    border: 1px solid rgba(220, 80, 80, 0.35);
-    color: #dc5050;
-    padding: 8px 10px;
-    border-radius: 4px;
-    margin-bottom: 10px;
-    font-size: 12px;
-}
-.loading-line { color: var(--hex-fg-muted, #9aa0aa); padding: 8px 0; }
-
-.rank-tabs {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 10px;
-}
-.rank-tabs button {
-    background: transparent;
-    border: 1px solid var(--hex-border, #2c3140);
-    color: var(--hex-fg, #e6e8ee);
-    padding: 4px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-}
-.rank-tabs button.active {
-    background: var(--hex-accent, #5e8ad4);
-    border-color: var(--hex-accent, #5e8ad4);
-    color: white;
-}
-
-.meta-line {
-    display: flex;
-    justify-content: space-between;
-    font-size: 11px;
-    color: var(--hex-fg-muted, #9aa0aa);
-    margin-bottom: 6px;
-}
-
-.leaderboard-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-}
-.leaderboard-table th {
-    text-align: left;
-    padding: 6px 4px;
-    border-bottom: 1px solid var(--hex-border, #2c3140);
-    color: var(--hex-fg-muted, #9aa0aa);
-    font-weight: 500;
-    text-transform: uppercase;
-    font-size: 10px;
-    letter-spacing: 0.5px;
-}
-.leaderboard-table td {
-    padding: 6px 4px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
-.leaderboard-table .rank-col { width: 32px; color: var(--hex-fg-muted, #9aa0aa); }
-.leaderboard-table .rarity-col { width: 80px; }
-.leaderboard-table .metric-col { text-align: right; font-variant-numeric: tabular-nums; }
-.leaderboard-table .sample-col { text-align: right; color: var(--hex-fg-muted, #9aa0aa); font-variant-numeric: tabular-nums; }
-
-.augment-name-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.leaderboard-augment-icon { width: 26px; height: 26px; flex: 0 0 auto; border-radius: 4px; object-fit: cover; }
-.augment-name { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.rarity-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-}
-.rarity-silver { background: #6c7a89; color: white; }
-.rarity-gold { background: #dca63c; color: #1f2330; }
-.rarity-prismatic { background: #c170d8; color: white; }
-.rarity-unknown { background: #3a3f4b; color: var(--hex-fg-muted, #9aa0aa); }
-
-.empty-row {
-    text-align: center;
-    color: var(--hex-fg-muted, #9aa0aa);
-    padding: 16px 4px;
-}
+@keyframes spin { to { transform: rotate(360deg); } }
+.leaderboard-tabs { display: flex; margin-bottom: 10px; }
+.leaderboard-tabs button { flex: 1; height: 30px; border: 1px solid var(--hex-border, #2c3140); background: transparent; color: var(--hex-fg-muted, #9aa0aa); font-size: 12px; font-weight: 700; cursor: pointer; }
+.leaderboard-tabs button:first-child { border-radius: 4px 0 0 4px; }
+.leaderboard-tabs button:not(:first-child) { margin-left: -1px; }
+.leaderboard-tabs button:last-child { border-radius: 0 4px 4px 0; }
+.leaderboard-tabs button.active { position: relative; z-index: 1; background: var(--hex-accent, #5e8ad4); border-color: var(--hex-accent, #5e8ad4); color: white; }
+.champion-picker { min-width: 104px; max-width: 142px; }
+.champion-picker select { width: 100%; height: 28px; padding: 0 24px 0 8px; border: 1px solid var(--hex-border, #2c3140); border-radius: 4px; background: var(--hex-bg, #171a22); color: var(--hex-fg, #e6e8ee); font: inherit; font-size: 12px; cursor: pointer; }
+.champion-picker select:disabled { opacity: .55; cursor: wait; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.error-banner { padding: 8px 10px; border: 1px solid rgba(220,80,80,.35); border-radius: 4px; background: rgba(220,80,80,.12); color: #dc5050; font-size: 12px; }
 </style>

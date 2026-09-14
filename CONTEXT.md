@@ -20,6 +20,18 @@ _Avoid_: Champion monitoring switch, OCR switch
 Gameflow screenshot flow first captures a small `640x360` gate frame during normal play and only upgrades to a full `1024x576` OCR frame after consecutive candidate frames; full OCR backs off for about four seconds after no-match frames.
 _Avoid_: treating gate frames as OCR frames
 
+**符文榜**:
+The Arena leaderboard tab that ranks augments for one selected champion.
+_Avoid_: calling it the global augment ranking
+
+**英雄胜率榜**:
+The Arena leaderboard tab that ranks champions by their overall Arena win rate and pick rate.
+_Avoid_: using it for champion-specific augment stats
+
+**组合榜**:
+The Arena leaderboard tab that ranks three-player and two-player Arena combinations.
+_Avoid_: calling a combination a champion build
+
 ## Example Dialogue
 
 Developer: "The user disabled Champion Details visibility. Should champion monitoring stop?"

@@ -66,16 +66,24 @@ export function extractOpggAugments(html: string): OpggAugmentRecord[] {
  * payloads. Exposed for tests and for callers that want the raw map.
  */
 export function findAugmentTierMap(html: string): Record<string, unknown> | null {
+  for (const parsed of extractRscJsonPayloads(html)) {
+    const data = locateAugmentTierMap(parsed)
+    if (data) return data
+  }
+  return null
+}
+
+/** Decode every JSON-bearing RSC push in the page, ignoring non-JSON chunks. */
+export function extractRscJsonPayloads(html: string): unknown[] {
+  const payloads: unknown[] = []
   const re = new RegExp(RSC_PUSH_RE.source, 'g')
   let m: RegExpExecArray | null
   while ((m = re.exec(html)) !== null) {
     const body = unescapeStringLiteral(m[2])
     const parsed = parseChunkPayload(body)
-    if (parsed === null) continue
-    const data = locateAugmentTierMap(parsed)
-    if (data) return data
+    if (parsed !== null) payloads.push(parsed)
   }
-  return null
+  return payloads
 }
 
 /**
