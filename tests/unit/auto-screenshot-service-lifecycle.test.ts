@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolveCaptureStage } from '../../src/main/auto-screenshot-policy.ts'
-import { catalogAugmentIds } from '../../src/main/services/arena-augment-data/index.ts'
+import { catalogAugmentIds, opggItemSource } from '../../src/main/services/arena-augment-data/index.ts'
 
 const mocks = vi.hoisted(() => ({
   captureScreenshot: vi.fn(),
@@ -8,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   analyzeScreenshotGate: vi.fn(),
   warmupImageAnalyzer: vi.fn(),
   prepareWindows: vi.fn(),
+  ensureFloatingWindow: vi.fn(),
   windows: [] as any[],
   logger: {
     debug: vi.fn(),
@@ -51,6 +54,7 @@ vi.mock('../../src/main/modules/window-manager.ts', () => ({
   applyFloatingWindowLayout: vi.fn(),
   raiseOverlayWindow: vi.fn(),
   ensureAugmentOverlayWindows: mocks.prepareWindows,
+  ensureFloatingWindow: mocks.ensureFloatingWindow,
 }))
 vi.mock('../../src/main/modules/overlay-window-state.ts', () => ({
   shouldRaiseOverlayWindow: vi.fn(() => false),
@@ -73,6 +77,7 @@ vi.mock('../../src/main/modules/user-preferences.ts', () => ({
 }))
 
 import autoScreenshotService from '../../src/main/auto-screenshot-service.ts'
+import appStore from '../../src/main/modules/app-store.ts'
 
 const createRunningIdleService = () => {
   autoScreenshotService.reset()
@@ -303,5 +308,45 @@ describe.sequential('automatic screenshot service lifecycle', () => {
     } finally {
       delete process.env.ARENA_AUGMENT_SOURCE
     }
+  })
+
+  it('matches prismatic item OCR texts and sends the item overlay payload', async () => {
+    const service = createRunningIdleService()
+    const fixture = readFileSync(fileURLToPath(new URL('../fixtures/opgg/arena-kalista-items.html', import.meta.url)), 'utf8')
+    service.arenaItemSource = opggItemSource({ fetcher: async () => fixture, defaultChampionSlug: 'Kalista' })
+    appStore.get.mockReturnValue(429)
+    const send = vi.fn()
+    const floatingWindow = {
+      isDestroyed: () => false,
+      isVisible: () => false,
+      hide: vi.fn(),
+      webContents: { getURL: () => 'http://localhost/#/floating-overlay', send },
+    }
+    mocks.windows.push(floatingWindow)
+    mocks.ensureFloatingWindow.mockResolvedValue(floatingWindow)
+
+    const handled = await service._tryArenaItemSelection({
+      timestamp: Date.now(),
+      analysis: {
+        cardCount: 0,
+        augments: [],
+        slotDiagnostics: [
+          { slot: 0, text: '收割者的过路费 3.09' },
+          { slot: 1, text: '断筋者' },
+          { slot: 2, text: '暗钢利爪' },
+        ],
+      },
+    })
+
+    expect(handled).toBe(true)
+    expect(send).toHaveBeenCalledWith('arena-item-detected', expect.objectContaining({
+      mode: 'items',
+      championId: 429,
+      items: expect.arrayContaining([
+        expect.objectContaining({ itemId: 443090, detectedSlot: 0, isTopPick: true }),
+        expect.objectContaining({ itemId: 443069, detectedSlot: 1 }),
+        expect.objectContaining({ itemId: 443054, detectedSlot: 2 }),
+      ]),
+    }))
   })
 })

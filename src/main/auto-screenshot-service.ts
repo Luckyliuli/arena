@@ -27,6 +27,7 @@ import logger from './modules/logger.ts'
 import {
     applyAugmentSidePanelWindowLayout,
     applyFloatingWindowLayout,
+    ensureFloatingWindow,
     ensureAugmentOverlayWindows,
     raiseOverlayWindow,
 } from './modules/window-manager.ts'
@@ -227,6 +228,11 @@ class AutoScreenshotService {
         this.partialOcrSaveCount = 0
         this.lastDetectedAugmentAt = 0
         this.visibleAugmentMissCount = 0
+        this.arenaItemSource = null
+        this.lastDetectedArenaItemIds = []
+        this.lastDetectedArenaItemAt = 0
+        this.arenaItemMissCount = 0
+        this.lastArenaItemMatchAttemptAt = 0
         this.startedAt = 0
         this.firstCaptureLogged = false
         this.firstDetectionLogged = false
@@ -747,6 +753,11 @@ class AutoScreenshotService {
                 })
                 this._returnToGateAfterFullOcrMiss('analysis-failed')
                 return  // 分析失败，不继续处理
+            }
+
+            if (analysisResult.analysis.cardCount === 0 || (analysisResult.analysis.augments?.length ?? 0) === 0) {
+                const handledArenaItemSelection = await this._tryArenaItemSelection(analysisResult)
+                if (handledArenaItemSelection) return
             }
 
             const { cardCount, confidence, isAugmentPhase, augments } = analysisResult.analysis
@@ -1370,12 +1381,126 @@ class AutoScreenshotService {
         }
     }
 
+    async _getArenaItemSource() {
+        if (!this.arenaItemSource) {
+            const { fileOpggItemCache, opggItemSource } = await import('./services/arena-augment-data/index.ts')
+            const { getArenaAugmentCacheDir } = await import('./modules/app-paths.ts')
+            this.arenaItemSource = opggItemSource({ cache: fileOpggItemCache(getArenaAugmentCacheDir()) })
+        }
+        return this.arenaItemSource
+    }
+
+    async _tryArenaItemSelection(analysisResult) {
+        const now = Date.now()
+        if (now - this.lastArenaItemMatchAttemptAt < 1000) return false
+        this.lastArenaItemMatchAttemptAt = now
+
+        const championId = Number(store.get('lastSelectedChampionId'))
+        if (!Number.isInteger(championId) || championId <= 0) return false
+
+        const slotTexts = [0, 1, 2].map(slot => {
+            const diagnostic = (analysisResult.analysis.slotDiagnostics || []).find(entry => Number(entry?.slot) === slot)
+            return String(diagnostic?.text || '').trim()
+        })
+        if (slotTexts.filter(Boolean).length < 3) {
+            this._handleArenaItemMiss('insufficient-slot-text')
+            return false
+        }
+
+        try {
+            const { matchArenaItemSlotTexts, recommendArenaItemCandidates } = await import('./services/arena-augment-data/index.ts')
+            const source = await this._getArenaItemSource()
+            const bundle = await source.getItemsForChampion(championId)
+            if (bundle.reason) {
+                logger.warn('[arena-item] source returned no records', { championId, reason: bundle.reason })
+            }
+            const candidates = matchArenaItemSlotTexts(slotTexts, bundle.categories.prismatic)
+            if (candidates.length < 3) {
+                logger.debug('[arena-item] OCR did not resolve three prismatic items', {
+                    championId,
+                    slotTexts: slotTexts.map(text => text.slice(0, 80)),
+                    matchedCount: candidates.length,
+                })
+                this._handleArenaItemMiss('item-match-incomplete')
+                return false
+            }
+
+            const items = recommendArenaItemCandidates(candidates, bundle.categories.prismatic)
+            const currentIds = items.map(item => item.itemId).filter(Boolean)
+            const changed = currentIds.join(',') !== this.lastDetectedArenaItemIds.join(',')
+            this.arenaItemMissCount = 0
+            this.lastDetectedArenaItemIds = currentIds
+            this.lastDetectedArenaItemAt = Date.now()
+
+            if (changed) {
+                logger.info('[arena-item] detected', {
+                    championId,
+                    itemIds: currentIds,
+                    topPickItemId: items.find(item => item.isTopPick)?.itemId ?? null,
+                })
+                await this._sendArenaItemDetectedPayload({
+                    success: true,
+                    mode: 'items',
+                    gamePhase: 'arena-item-select',
+                    championId,
+                    items,
+                    dataSource: 'auto-analysis',
+                    timestamp: analysisResult.timestamp || Date.now(),
+                })
+            }
+            return true
+        } catch (error) {
+            logger.warn('[arena-item] matching failed', { championId, error: error.message })
+            this._handleArenaItemMiss('item-match-error')
+            return false
+        }
+    }
+
+    async _sendArenaItemDetectedPayload(payload) {
+        if (!shouldShowAugmentTopOverlay()) return false
+        const floatingWindow = await ensureFloatingWindow()
+        if (!floatingWindow || floatingWindow.isDestroyed()) return false
+        applyFloatingWindowLayout()
+        raiseOverlayWindow(floatingWindow, 'floating')
+        floatingWindow.webContents.send('arena-item-detected', payload)
+        return true
+    }
+
+    _handleArenaItemMiss(reason) {
+        if (this.lastDetectedArenaItemIds.length === 0) return
+        this.arenaItemMissCount += 1
+        if (this.arenaItemMissCount < 2) return
+        logger.info('[arena-item] overlay cleared after OCR miss', {
+            reason,
+            previousIds: this.lastDetectedArenaItemIds,
+            ageMs: this.lastDetectedArenaItemAt ? Date.now() - this.lastDetectedArenaItemAt : null,
+        })
+        this._notifyArenaItemCleared(reason)
+    }
+
+    _notifyArenaItemCleared(reason = 'unknown') {
+        const hadVisibleItems = this.lastDetectedArenaItemIds.length > 0
+        this.lastDetectedArenaItemIds = []
+        this.lastDetectedArenaItemAt = 0
+        this.arenaItemMissCount = 0
+        if (!hadVisibleItems) return
+
+        const windows = BrowserWindow.getAllWindows()
+        const payload = { success: true, mode: 'items', reason, timestamp: Date.now() }
+        const floatingWindow = windows.find(win => win.webContents.getURL().includes('floating-overlay'))
+        if (floatingWindow && !floatingWindow.isDestroyed()) {
+            floatingWindow.webContents.send('arena-item-cleared', payload)
+            floatingWindow.hide()
+        }
+    }
+
     /**
      * 通知所有窗口有新的海克斯检测
      * @private
      */
     async _notifyAugmentDetected(analysisResult) {
         try {
+            this._notifyArenaItemCleared('augment-detected')
             // 从store中获取缓存的英雄ID
             const championId = store.get('lastSelectedChampionId')
 
@@ -1469,6 +1594,7 @@ class AutoScreenshotService {
      * @private
      */
     _notifyAugmentCleared(reason = 'unknown') {
+        this._notifyArenaItemCleared(reason)
         try {
             const windows = BrowserWindow.getAllWindows()
             const payload = {
@@ -1809,6 +1935,11 @@ class AutoScreenshotService {
         this.lastManualHiddenSuppressLogAt = 0
         this.lastDetectedAugmentAt = 0
         this.visibleAugmentMissCount = 0
+        this.arenaItemSource = null
+        this.lastDetectedArenaItemIds = []
+        this.lastDetectedArenaItemAt = 0
+        this.arenaItemMissCount = 0
+        this.lastArenaItemMatchAttemptAt = 0
         this.startedAt = 0
         this.firstCaptureLogged = false
         this.firstDetectionLogged = false

@@ -60,3 +60,5 @@ export {
   type ArenaItemRecommendation,
   type ArenaItemRecommendationCandidate,
 } from './itemRecommendation.ts'
+
+export { matchArenaItemSlotTexts } from './itemMatcher.ts'
