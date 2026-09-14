@@ -11,6 +11,7 @@ import {
     applyPopupWindowLayout,
     getAugmentSidePanelWindow,
     ensurePopupWindow,
+    ensureFloatingWindow,
     ensureAugmentOverlayWindows,
     getFloatingWindow,
     getMainWindow,
@@ -274,6 +275,51 @@ async function buildRandomAugmentPreviewData(context = 'random-augment-preview')
     throw new Error('没有可用英雄海克斯数据')
 }
 
+async function buildRandomArenaItemPreviewData(context = 'random-arena-item-preview') {
+    const startedAt = Date.now()
+    const { loadChampionRoster } = await import('../data-loader.ts')
+    const champions = await loadChampionRoster()
+    if (!champions.length) throw new Error('No champion data available')
+
+    const {
+        fileOpggItemCache,
+        opggItemSource,
+        recommendArenaItemCandidates,
+    } = await import('../services/arena-augment-data/index.ts')
+    const { getArenaAugmentCacheDir } = await import('./app-paths.ts')
+    const source = opggItemSource({ cache: fileOpggItemCache(getArenaAugmentCacheDir()) })
+
+    for (const champion of sampleItems(champions, Math.min(champions.length, 12))) {
+        const bundle = await source.getItemsForChampion(Number(champion.championId))
+        const candidates = bundle.categories.prismatic.slice(0, 3).map((row, index) => ({
+            itemId: row.items[0]?.itemId ?? null,
+            name: row.items[0]?.name || '',
+            iconUrl: row.items[0]?.iconUrl || null,
+            detectedSlot: index,
+        }))
+        if (candidates.length < 3) continue
+
+        const items = recommendArenaItemCandidates(candidates, bundle.categories.prismatic)
+        logger.info(`[diagnostics] ${context}: random preview data ready`, {
+            championId: champion.championId,
+            itemIds: items.map(item => item.itemId),
+            durationMs: getElapsedMs(startedAt),
+        })
+        return {
+            success: true,
+            mode: 'items',
+            gamePhase: 'arena-item-select',
+            championId: Number(champion.championId),
+            championName: getChampionDisplayName(champion),
+            items,
+            timestamp: Date.now(),
+            dataSource: 'test',
+        }
+    }
+
+    throw new Error('No champion with three prismatic items available')
+}
+
 export function registerIpcHandlers(_isDev: boolean): void {
     registerPreferencesIpcHandlers()
     registerSystemIpcHandlers()
@@ -406,6 +452,32 @@ export function registerIpcHandlers(_isDev: boolean): void {
             return { success: true }
         } catch (error) {
             logger.error('Failed to test floating window:', error)
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    ipcMain.handle('test-show-random-arena-items', async () => {
+        const startedAt = Date.now()
+        try {
+            if (!shouldShowAugmentTopOverlay()) {
+                return { success: true, skipped: true, reason: 'top-overlay-disabled' }
+            }
+            const data = await buildRandomArenaItemPreviewData('random-arena-item-preview')
+            const floatingWindow = await ensureFloatingWindow()
+            if (!floatingWindow || floatingWindow.isDestroyed()) {
+                return { success: false, error: 'Floating window does not exist' }
+            }
+            applyFloatingWindowLayout()
+            raiseOverlayWindow(floatingWindow, 'floating')
+            floatingWindow.webContents.send('arena-item-detected', data)
+            logger.info('Random prismatic item preview sent to floating window', {
+                championId: data.championId,
+                itemIds: data.items.map(item => item.itemId),
+                durationMs: getElapsedMs(startedAt),
+            })
+            return { success: true, championId: data.championId, itemIds: data.items.map(item => item.itemId) }
+        } catch (error) {
+            logger.error('Failed to test prismatic item floating window:', error)
             return { success: false, error: getErrorMessage(error) }
         }
     })

@@ -244,6 +244,13 @@ onMounted(() => {
     showOverlay(data)
   }))
 
+  unsubscribeEvents.push(electronAPI.events.on('arena-item-detected', () => {
+    visible.value = false
+    detectedAugments.value = []
+    recommendationMock.value = false
+    error.value = null
+  }))
+
   unsubscribeEvents.push(electronAPI.events.on('augment-cleared', (data) => {
     console.log('🔧 [FloatingOverlay] 收到 augment-cleared:', data)
     closeOverlay('augment-cleared')

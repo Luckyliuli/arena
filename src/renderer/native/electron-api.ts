@@ -89,6 +89,8 @@ export const electronAPI: ElectronAPI = {
       requireElectronAPI().diagnostics.testShowRandomFloating(...args),
     testShowRandomPopup: (...args) =>
       requireElectronAPI().diagnostics.testShowRandomPopup(...args),
+    testShowRandomArenaItems: (...args) =>
+      requireElectronAPI().diagnostics.testShowRandomArenaItems(...args),
     logRendererError: (...args) => requireElectronAPI().diagnostics.logRendererError(...args),
     logRendererInfo: (...args) => requireElectronAPI().diagnostics.logRendererInfo(...args),
   },

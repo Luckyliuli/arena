@@ -223,6 +223,14 @@
                             </span>
                         </button>
 
+                        <button class="test-btn secondary" @click="testItemFloatingWindow">
+                            <Gem class="icon" />
+                            <span class="button-copy">
+                                <span class="text">{{ t('display.prismaticItemOverlay') }}</span>
+                                <span class="hint">{{ t('display.randomChampionPrismaticItems') }}</span>
+                            </span>
+                        </button>
+
                         <button class="test-btn secondary" @click="testPopupWindow">
                             <ClipboardList class="icon" />
                             <span class="button-copy">
@@ -353,6 +361,7 @@ import {
     Cpu,
     Download,
     FolderSearch,
+    Gem,
     Languages,
     Minus,
     RefreshCw,
@@ -772,6 +781,23 @@ const testFloatingWindow = async () => {
         testStatus.value = {
             type: 'success',
             message: formatRandomPreviewMessage(t('display.augmentPreviewSent'), result),
+        }
+    } catch (err) {
+        testStatus.value = { type: 'error', message: t('display.sendingFailedWithReason', { error: err.message }) }
+    }
+}
+
+const testItemFloatingWindow = async () => {
+    testStatus.value = { type: 'info', message: t('display.openingPrismaticItemPreview') }
+
+    try {
+        const result = await electronAPI.diagnostics.testShowRandomArenaItems()
+        if (!result.success) {
+            throw new Error(result.error || t('display.sendingFailed'))
+        }
+        testStatus.value = {
+            type: 'success',
+            message: formatRandomPreviewMessage(t('display.prismaticItemPreviewSent'), result),
         }
     } catch (err) {
         testStatus.value = { type: 'error', message: t('display.sendingFailedWithReason', { error: err.message }) }

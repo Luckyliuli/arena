@@ -1,12 +1,14 @@
 <template>
   <div class="floating-view">
     <AugmentFloatingOverlay />
+    <ArenaItemFloatingOverlay />
   </div>
 </template>
 
 <script setup>
 import { onBeforeUnmount, onMounted } from 'vue'
 import AugmentFloatingOverlay from './AugmentFloatingOverlay.vue'
+import ArenaItemFloatingOverlay from './ArenaItemFloatingOverlay.vue'
 
 const overlayWindowClass = 'floating-overlay-window'
 
@@ -33,7 +35,8 @@ onBeforeUnmount(() => {
 }
 
 /* 让子元素可以接收鼠标事件 */
-.floating-view :deep(.floating-overlay) {
+.floating-view :deep(.floating-overlay),
+.floating-view :deep(.arena-item-overlay) {
   pointer-events: auto;
 }
 

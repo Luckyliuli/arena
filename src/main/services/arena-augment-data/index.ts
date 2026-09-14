@@ -52,3 +52,11 @@ export {
   type OpggCache,
   type FileOpggCacheOptions,
 } from './opgg/cache.ts'
+
+export {
+  compareArenaItemStats,
+  orderArenaItemRecommendations,
+  recommendArenaItemCandidates,
+  type ArenaItemRecommendation,
+  type ArenaItemRecommendationCandidate,
+} from './itemRecommendation.ts'

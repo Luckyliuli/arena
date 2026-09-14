@@ -260,10 +260,27 @@ export interface ArenaOverlayAugmentPayload extends LooseRecord {
   isUpgrade?: boolean
 }
 
+export interface ArenaOverlayItemPayload extends LooseRecord {
+  itemId?: number | null
+  name?: string
+  iconUrl?: string | null
+  detectedSlot?: number | null
+  missing?: boolean
+  averagePlacement?: number | null
+  firstPlaceRate?: number | null
+  pickRate?: number | null
+  sampleSize?: number | null
+  winRate?: number | null
+  dataAvailable?: boolean
+  isTopPick?: boolean
+}
+
 export interface OverlayPayload extends LooseRecord {
   championId?: number | null
   championName?: string
+  mode?: 'augments' | 'items'
   augments?: ArenaOverlayAugmentPayload[]
+  items?: ArenaOverlayItemPayload[]
   dataSource?: string
   timestamp?: number
   error?: string
@@ -407,6 +424,8 @@ export interface ElectronEventMap {
   'augment-detection-started': [payload?: LooseRecord]
   'augment-detected': [payload: OverlayPayload]
   'augment-cleared': [payload?: LooseRecord]
+  'arena-item-detected': [payload: OverlayPayload]
+  'arena-item-cleared': [payload?: LooseRecord]
   'game-ended': [payload?: LooseRecord]
   'end-of-game': [payload?: LooseRecord]
   'quit-confirm-requested': []
@@ -484,6 +503,7 @@ export interface ElectronAPI {
     testShowFloating(data: LooseRecord): Promise<OperationResult>
     testShowRandomFloating(): Promise<OperationResult>
     testShowRandomPopup(): Promise<OperationResult>
+    testShowRandomArenaItems(): Promise<OperationResult>
     logRendererError(errorData: LooseRecord): Promise<OperationResult>
     logRendererInfo(data: LooseRecord): void
   }
