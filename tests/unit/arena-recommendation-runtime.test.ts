@@ -18,11 +18,12 @@ describe('Arena recommendation runtime', () => {
     const runtime = createArenaRecommendationRuntime({
       augmentSource: { id: 'opgg', label: 'OP.GG', getStatsForChampion },
       itemSource: { id: 'opgg', label: 'OP.GG', getItemsForChampion },
+      patchProvider: async () => '16.18',
     })
 
     await expect(runtime.getAugmentStats(22, { patch: '16.18' })).resolves.toBe(augmentBundle)
     await expect(runtime.getItemStats(22)).resolves.toBe(itemBundle)
     expect(getStatsForChampion).toHaveBeenCalledWith(22, { patch: '16.18' })
-    expect(getItemsForChampion).toHaveBeenCalledWith(22)
+    expect(getItemsForChampion).toHaveBeenCalledWith(22, { patch: '16.18' })
   })
 })

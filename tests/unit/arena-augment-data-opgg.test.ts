@@ -15,6 +15,8 @@ import { describe, expect, it } from 'vitest'
 import { readFile } from 'node:fs/promises'
 import {
   extractOpggAugments,
+  buildOpggUrl,
+  extractOpggPagePatch,
   findAugmentTierMap,
   offlineOpggHtmlFetcher,
   onlineOpggHtmlFetcher,
@@ -30,6 +32,12 @@ async function loadAnnie(): Promise<string> {
 }
 
 describe('extractOpggAugments (RSC payload)', () => {
+  it('builds and verifies the explicit OP.GG patch selection', () => {
+    expect(buildOpggUrl('https://op.gg/zh-cn/lol/modes/arena/Annie/augments', '16.18'))
+      .toBe('https://op.gg/zh-cn/lol/modes/arena/Annie/augments?patch=16.18')
+    expect(extractOpggPagePatch('<option value="16.18" selected>版本 16.18</option>')).toBe('16.18')
+    expect(extractOpggPagePatch('\\"patch_version\\":\\"16.17\\"')).toBe('16.17')
+  })
   it('returns [] when the page carries no augment chunk', () => {
     const empty = '<!DOCTYPE html><html><body><h1>Empty</h1></body></html>'
     expect(extractOpggAugments(empty)).toEqual([])
@@ -79,6 +87,14 @@ describe('extractOpggAugments (RSC payload)', () => {
 })
 
 describe('opggSource (offline fixture, real payload shape)', () => {
+  it('rejects a page when OP.GG silently serves a different patch', async () => {
+    const html = '<option value="16.17" selected></option>' + await loadAnnie()
+    const src = opggSource({ fetcher: async () => html })
+    const bundle = await src.getStatsForChampion(1, { patch: '16.18' })
+    expect(bundle.reason).toBe('patch-unavailable')
+    expect(bundle.patch).toBe('16.17')
+    expect(bundle.records).toEqual([])
+  })
   it('resolves championId -> OP.GG slug -> fixture and returns real rows', async () => {
     const src = opggSource({ fetcher: offlineOpggHtmlFetcher(FIXTURES) })
     // championId 1 is Annie, whose slug the offline fetcher resolves to

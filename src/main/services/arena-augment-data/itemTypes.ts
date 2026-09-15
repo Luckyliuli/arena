@@ -21,6 +21,7 @@ export type ArenaItemCategories = Record<ArenaItemCategory, ArenaItemPerfStat[]>
 
 export type ArenaItemStatsBundle = {
   fetchedAt: string
+  patch?: string
   source: 'opgg'
   mock: false
   categories: ArenaItemCategories

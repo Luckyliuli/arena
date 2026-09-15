@@ -26,7 +26,7 @@ import {
 import { findChampionSlug } from '../../../../shared/champion-map.ts'
 import type { ArenaAugmentSource, AugmentPerfStat, AugmentStatsBundle } from '../interface.ts'
 import { extractOpggAugments, type OpggAugmentRecord } from './rscParser.ts'
-import { onlineOpggHtmlFetcher, type ArenaAugmentHtmlFetcher } from './fetcher.ts'
+import { extractOpggPagePatch, onlineOpggHtmlFetcher, type ArenaAugmentHtmlFetcher } from './fetcher.ts'
 import type { OpggCache } from './cache.ts'
 
 export interface OpggSourceOptions {
@@ -46,9 +46,10 @@ export function opggSource(opts: OpggSourceOptions = {}): ArenaAugmentSource {
   return {
     id: 'opgg',
     label,
-    async getStatsForChampion(championId: number): Promise<AugmentStatsBundle> {
+    async getStatsForChampion(championId: number, options = {}): Promise<AugmentStatsBundle> {
+      const patch = options.patch
       if (cache) {
-        const hit = await cache.get(championId)
+        const hit = await cache.get(championId, patch)
         if (hit) return hit
       }
 
@@ -57,10 +58,13 @@ export function opggSource(opts: OpggSourceOptions = {}): ArenaAugmentSource {
 
       let html: string
       try {
-        html = await fetcher(slug)
+        html = await fetcher(slug, { patch })
       } catch {
         return emptyBundle('fetch-failed')
       }
+
+      const pagePatch = extractOpggPagePatch(html)
+      if (patch && pagePatch && pagePatch !== patch) return emptyBundle('patch-unavailable', pagePatch)
 
       const parsed = extractOpggAugments(html)
       if (parsed.length === 0) return emptyBundle('page-shape-changed')
@@ -74,19 +78,21 @@ export function opggSource(opts: OpggSourceOptions = {}): ArenaAugmentSource {
 
       const bundle: AugmentStatsBundle = {
         fetchedAt: new Date().toISOString(),
+        patch: pagePatch || patch,
         source: 'opgg',
         mock: false,
         records,
       }
-      if (cache) await cache.set(championId, bundle)
+      if (cache) await cache.set(championId, bundle, patch)
       return bundle
     },
   }
 }
 
-function emptyBundle(reason: string): AugmentStatsBundle {
+function emptyBundle(reason: string, patch?: string): AugmentStatsBundle {
   return {
     fetchedAt: new Date().toISOString(),
+    patch,
     source: 'opgg',
     mock: false,
     records: [],

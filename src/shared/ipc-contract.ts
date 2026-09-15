@@ -57,6 +57,9 @@ export interface OperationResult extends LooseRecord {
 
 export interface ClientVersionInfo extends LooseRecord {
   currentVersion?: string
+  leagueClientVersion?: string
+  leaguePatch?: string
+  opggDataVersion?: string
   latestVersion?: string
   dataVersion?: string
   gamePatch?: string

@@ -26,7 +26,11 @@ import { promises as fs } from 'node:fs'
 import * as https from 'node:https'
 import * as path from 'node:path'
 
-export type ArenaAugmentHtmlFetcher = (championSlug: string) => Promise<string>
+export type OpggFetchOptions = { patch?: string }
+export type ArenaAugmentHtmlFetcher = (
+  championSlug: string,
+  options?: OpggFetchOptions
+) => Promise<string>
 
 export interface OnlineOpggFetcherOptions {
   signal?: AbortSignal
@@ -61,19 +65,22 @@ export function offlineOpggHtmlFetcher(rootDir: string): ArenaAugmentHtmlFetcher
 export function onlineOpggHtmlFetcher(opts: OnlineOpggFetcherOptions = {}): ArenaAugmentHtmlFetcher {
   const locale = opts.locale ?? 'zh-cn'
   return createOnlineOpggHtmlFetcher(
-    championSlug => `https://op.gg/${locale}/lol/modes/arena/${championSlug}/augments`,
+    (championSlug, patch) => buildOpggUrl(
+      `https://op.gg/${locale}/lol/modes/arena/${championSlug}/augments`,
+      patch,
+    ),
     opts,
   )
 }
 
 function createOnlineOpggHtmlFetcher(
-  urlForSlug: (championSlug: string) => string,
+  urlForSlug: (championSlug: string, patch?: string) => string,
   opts: OnlineOpggFetcherOptions,
 ): ArenaAugmentHtmlFetcher {
   const userAgent = opts.userAgent ?? DEFAULT_UA
   const timeoutMs = opts.timeoutMs ?? 20000
-  return async (championSlug: string) => {
-    const url = urlForSlug(championSlug)
+  return async (championSlug: string, options = {}) => {
+    const url = urlForSlug(championSlug, options.patch)
     return new Promise<string>((resolve, reject) => {
       const req = https.get(
         url,
@@ -103,6 +110,25 @@ function createOnlineOpggHtmlFetcher(
   }
 }
 
+export function buildOpggUrl(baseUrl: string, patch?: string): string {
+  if (!patch) return baseUrl
+  const url = new URL(baseUrl)
+  url.searchParams.set('patch', patch)
+  return url.toString()
+}
+
+export function extractOpggPagePatch(html: string): string {
+  const patterns = [
+    /<option[^>]+value=["'](\d{1,2}\.\d{1,2})["'][^>]*selected/i,
+    /\\?["']patch(?:_version)?\\?["']\s*:\s*\\?["'](\d{1,2}\.\d{1,2})/i,
+  ]
+  for (const pattern of patterns) {
+    const match = pattern.exec(html)
+    if (match) return match[1]
+  }
+  return ''
+}
+
 
 export function offlineOpggItemsHtmlFetcher(rootDir: string): ArenaAugmentHtmlFetcher {
   return offlineOpggHtmlFetcher(rootDir)
@@ -111,7 +137,10 @@ export function offlineOpggItemsHtmlFetcher(rootDir: string): ArenaAugmentHtmlFe
 export function onlineOpggItemsHtmlFetcher(opts: OnlineOpggFetcherOptions = {}): ArenaAugmentHtmlFetcher {
   const locale = opts.locale ?? 'zh-cn'
   return createOnlineOpggHtmlFetcher(
-    championSlug => `https://op.gg/${locale}/lol/modes/arena/${championSlug}/items`,
+    (championSlug, patch) => buildOpggUrl(
+      `https://op.gg/${locale}/lol/modes/arena/${championSlug}/items`,
+      patch,
+    ),
     opts,
   )
 }
@@ -119,7 +148,10 @@ export function onlineOpggItemsHtmlFetcher(opts: OnlineOpggFetcherOptions = {}):
 export function onlineOpggBuildHtmlFetcher(opts: OnlineOpggFetcherOptions = {}): ArenaAugmentHtmlFetcher {
   const locale = opts.locale ?? 'zh-cn'
   return createOnlineOpggHtmlFetcher(
-    championSlug => `https://op.gg/${locale}/lol/modes/arena/${championSlug}/build`,
+    (championSlug, patch) => buildOpggUrl(
+      `https://op.gg/${locale}/lol/modes/arena/${championSlug}/build`,
+      patch,
+    ),
     opts,
   )
 }

@@ -250,7 +250,7 @@
 
             <footer class="hex-footer">
                 <p>
-                    {{ t('display.brand') }} v{{ clientVersionLabel }} -
+                    {{ t('display.brand') }} v{{ appVersionLabel }} -
                     <button class="footer-link footer-action" type="button" @click="openLogDirectory">
                         {{ t('display.logDirectory') }}
                     </button>
@@ -395,16 +395,18 @@ const localeLoading = ref(false)
 const GITHUB_URL = 'https://github.com/valkia/aramgg_client'
 let removeQuitConfirmListener = null
 let removeLocaleChangedListener = null
+let versionRefreshTimer = null
 
 const clientVersionLabel = computed(() => {
     if (!versionInfo.value) {
         return '-'
     }
 
-    return versionInfo.value.currentVersion || '-'
+    return versionInfo.value.leaguePatch || versionInfo.value.leagueClientVersion || '-'
 })
 
-const dataVersionLabel = computed(() => versionInfo.value?.dataVersion || '-')
+const appVersionLabel = computed(() => versionInfo.value?.currentVersion || '-')
+const dataVersionLabel = computed(() => versionInfo.value?.opggDataVersion || '-')
 
 const selectedLocaleLabel = computed(() => {
     return supportedLocales.value.find((locale) => locale.code === selectedLocale.value)?.nativeLabel || selectedLocale.value
@@ -412,8 +414,8 @@ const selectedLocaleLabel = computed(() => {
 
 const dataLocaleStatusLabel = computed(() => {
     const parts = []
-    if (versionInfo.value?.gamePatch) {
-        parts.push(`LOL ${versionInfo.value.gamePatch}`)
+    if (versionInfo.value?.leagueClientVersion) {
+        parts.push(versionInfo.value.leagueClientVersion)
     }
     if (versionInfo.value?.locale) {
         parts.push(versionInfo.value.locale)
@@ -732,7 +734,7 @@ const formatChangelogDate = (date) => {
 }
 
 const isCurrentChangelogEntry = (entry) => {
-    return String(entry?.version || '').replace(/^v/i, '') === clientVersionLabel.value
+    return String(entry?.version || '').replace(/^v/i, '') === appVersionLabel.value
 }
 
 const openLogDirectory = async () => {
@@ -848,6 +850,7 @@ const quitApp = async () => {
 
 onMounted(() => {
     void loadLocale().finally(() => loadVersionInfo())
+    versionRefreshTimer = window.setInterval(loadVersionInfo, 60_000)
     loadManualLolPath()
     removeQuitConfirmListener = electronAPI.events.on('quit-confirm-requested', confirmQuitApp)
     removeLocaleChangedListener = electronAPI.events.on('locale-changed', ({ locale } = {}) => {
@@ -860,6 +863,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+    if (versionRefreshTimer) window.clearInterval(versionRefreshTimer)
+    versionRefreshTimer = null
     removeQuitConfirmListener?.()
     removeQuitConfirmListener = null
     removeLocaleChangedListener?.()
@@ -2075,4 +2080,3 @@ onBeforeUnmount(() => {
     }
 }
 </style>
-

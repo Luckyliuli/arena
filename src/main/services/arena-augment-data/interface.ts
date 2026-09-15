@@ -45,6 +45,7 @@ export type AugmentPerfStat = {
 
 export type AugmentStatsBundle = {
   fetchedAt: string
+  patch?: string
   source: 'mock' | 'communitydragon' | 'opgg' | 'riot-api'
   /** True when records are seeded from the augment id rather than real
    *  gameplay data. UI layers should suppress precision and label these

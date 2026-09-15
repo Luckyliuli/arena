@@ -106,7 +106,7 @@ describe('fileOpggCache', () => {
 
   it('returns null for a corrupt entry instead of throwing', async () => {
     const c = fileOpggCache(dir)
-    await fsp.writeFile(path.join(dir, 'champion-v2-7.json'), '{ not json', 'utf8')
+    await fsp.writeFile(path.join(dir, 'champion-v3-current-7.json'), '{ not json', 'utf8')
     expect(await c.get(7)).toBeNull()
   })
 
@@ -144,6 +144,16 @@ describe('fileOpggCache', () => {
 })
 
 describe('opggSource cache integration', () => {
+  it('keeps different League patches in separate cache entries', async () => {
+    const { fn, state } = countingFetcher(offlineOpggHtmlFetcher(FIXTURES))
+    const src = opggSource({ fetcher: fn, cache: memoryOpggCache() })
+
+    await src.getStatsForChampion(1, { patch: '16.17' })
+    await src.getStatsForChampion(1, { patch: '16.18' })
+    await src.getStatsForChampion(1, { patch: '16.18' })
+
+    expect(state.calls).toBe(2)
+  })
   it('serves the second request from cache without calling the fetcher again', async () => {
     const { fn, state } = countingFetcher(offlineOpggHtmlFetcher(FIXTURES))
     const cache = memoryOpggCache()

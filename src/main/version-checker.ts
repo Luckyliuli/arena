@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { getActiveDataStatus, loadDataApiConfig } from './data-loader.ts'
 import { getChangelogEntries } from './changelog.ts'
 import logger from './modules/logger.ts'
+import { readLeagueClientVersion } from './services/lcu/league-client-version.ts'
 
 const VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/
 type VersionSeverity = 'unknown' | 'none' | 'major' | 'minor' | 'patch'
@@ -91,9 +92,10 @@ function getSeverityText(severity: VersionSeverity): string {
 }
 
 export async function getVersionInfo() {
-  const [config, activeData] = await Promise.all([
+  const [config, activeData, leagueClient] = await Promise.all([
     loadDataApiConfig(),
     getActiveDataStatus(),
+    readLeagueClientVersion(),
   ])
   const currentVersion = app.getVersion()
   const clientConfig = config?.client || config?.electron || {}
@@ -107,6 +109,9 @@ export async function getVersionInfo() {
 
   return {
     currentVersion,
+    leagueClientVersion: leagueClient?.fullVersion || '',
+    leaguePatch: leagueClient?.patch || '',
+    opggDataVersion: leagueClient?.patch || '',
     latestVersion,
     downloadUrl: clientConfig.downloadUrl || '',
     autoUpdateEnabled: clientConfig.autoUpdateEnabled === true,
