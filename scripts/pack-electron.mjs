@@ -150,30 +150,6 @@ async function getPackageVersion() {
   return packageJson.version
 }
 
-async function logPreparedClientData() {
-  const localePointers = [
-    ['zh-CN', 'current.json'],
-    ['en-US', 'current.en-US.json'],
-    ['zh-TW', 'current.zh-TW.json'],
-  ]
-
-  for (const [locale, fileName] of localePointers) {
-    const currentJsonPath = path.join(process.cwd(), 'resources', 'client-data', fileName)
-    const current = JSON.parse(await readFile(currentJsonPath, 'utf8'))
-    if (current.locale !== locale) {
-      throw new Error(
-        `[pack] client-data locale mismatch in ${fileName}: expected ${locale}, got ${current.locale || 'missing'}`
-      )
-    }
-
-    console.log(
-      `[pack] client-data ready locale=${locale} dataVersion=${current.dataVersion || 'unknown'} ` +
-        `gamePatch=${current.gamePatch || 'unknown'} generatedAt=${current.generatedAt || 'unknown'} ` +
-        `files=${current.bundledFileCount ?? 'unknown'} shards=${current.bundledShardCount ?? 'unknown'}`
-    )
-  }
-}
-
 async function removeFileIfExists(filePath) {
   try {
     await rm(filePath, { force: true })
@@ -240,16 +216,6 @@ async function mirrorFallbackOutput(fallbackOutput, version) {
 async function main() {
   const packEnv = await createPackEnv()
   const packageVersion = await getPackageVersion()
-
-  const clientDataResult = await run('node', ['scripts/fetch-client-data.mjs'], {
-    env: packEnv,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-
-  if (clientDataResult.code !== 0) {
-    process.exit(clientDataResult.code ?? 1)
-  }
-  await logPreparedClientData()
 
   const buildResult = await run('electron-vite', ['build'], {
     env: packEnv,

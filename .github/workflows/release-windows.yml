@@ -69,41 +69,17 @@ jobs:
           $env:ELECTRON_BUILDER_CACHE = Join-Path $env:RUNNER_TEMP 'electron-builder-cache'
           npm run pack
 
-          $localeBundles = @(
-            @{ Locale = 'zh-CN'; Pointer = 'current.json'; VersionPrefix = 'versions' },
-            @{ Locale = 'en-US'; Pointer = 'current.en-US.json'; VersionPrefix = 'versions/en-US' },
-            @{ Locale = 'zh-TW'; Pointer = 'current.zh-TW.json'; VersionPrefix = 'versions/zh-TW' }
+          $arenaResources = @(
+            'augments-arena.json',
+            'champions-arena.json',
+            'items-arena.json',
+            'arena-leaderboard-snapshot.json'
           )
 
-          foreach ($bundle in $localeBundles) {
-            $clientDataCurrent = Join-Path $PWD "build/win-unpacked/resources/client-data/$($bundle.Pointer)"
-            if (!(Test-Path $clientDataCurrent)) {
-              Write-Error "Packaged client-data pointer was not found: $clientDataCurrent"
-              exit 1
-            }
-
-            $clientData = Get-Content $clientDataCurrent -Raw | ConvertFrom-Json
-            if ($clientData.locale -ne $bundle.Locale) {
-              Write-Error "Packaged client-data locale mismatch in $($bundle.Pointer): expected $($bundle.Locale), got $($clientData.locale)"
-              exit 1
-            }
-
-            $versionDir = Join-Path $PWD "build/win-unpacked/resources/client-data/$($bundle.VersionPrefix)/$($clientData.dataVersion)"
-            $requiredFiles = @('manifest.json', 'augments.json', 'champions.json', 'items.json', 'champion-shards/index.json')
-            foreach ($requiredFile in $requiredFiles) {
-              $requiredPath = Join-Path $versionDir $requiredFile
-              if (!(Test-Path $requiredPath)) {
-                Write-Error "Packaged $($bundle.Locale) client-data file was not found: $requiredPath"
-                exit 1
-              }
-            }
-
-            $shardDir = Join-Path $versionDir 'champion-shards'
-            $shardCount = @(Get-ChildItem $shardDir -Filter '*.json' -File | Where-Object { $_.Name -ne 'index.json' }).Count
-            Write-Host "Packaged client-data locale=$($bundle.Locale) dataVersion=$($clientData.dataVersion) gamePatch=$($clientData.gamePatch) files=$($clientData.bundledFileCount) shards=$shardCount bytes=$($clientData.bundledBytes)"
-
-            if ($shardCount -lt 40) {
-              Write-Error "Packaged $($bundle.Locale) client-data shard count is too low: $shardCount"
+          foreach ($resource in $arenaResources) {
+            $resourcePath = Join-Path $PWD "build/win-unpacked/resources/$resource"
+            if (!(Test-Path $resourcePath)) {
+              Write-Error "Packaged Arena resource was not found: $resourcePath"
               exit 1
             }
           }
@@ -128,7 +104,6 @@ jobs:
           path: |
             build/*.exe
             build/*.exe.blockmap
-            build/latest.yml
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -141,10 +116,9 @@ jobs:
           $assets = @(
             Get-ChildItem -Path build -Filter '*.exe' -File
             Get-ChildItem -Path build -Filter '*.exe.blockmap' -File
-            Get-Item -Path build/latest.yml
           )
 
-          if ($assets.Count -lt 3) {
+          if ($assets.Count -lt 2) {
             Write-Error "Expected release assets were not found in build/"
             exit 1
           }
@@ -157,7 +131,6 @@ jobs:
               'Assets:'
               '- `aramgg_client Setup *.exe`'
               '- `aramgg_client Setup *.exe.blockmap`'
-              '- `latest.yml`'
             ) -join [Environment]::NewLine
             gh release create $tag --title $tag --notes $notes
             if ($LASTEXITCODE -ne 0) {

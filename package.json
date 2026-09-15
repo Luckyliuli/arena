@@ -74,13 +74,6 @@
         "to": "paddleocr"
       },
       {
-        "to": "client-data",
-        "from": "resources/client-data",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
         "from": "resources/augments-arena.json",
         "to": "augments-arena.json"
       },

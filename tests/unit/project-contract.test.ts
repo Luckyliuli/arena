@@ -55,4 +55,17 @@ describe('Arena project contract', () => {
     expect(messages['zh-CN'].arenaLeaderboard.metricWinrate).toContain('口径未验证')
     expect(messages['en-US'].arenaLeaderboard.metricWinrate).toContain('unverified definition')
   })
+
+  it('packages and releases only resources that exist in the Arena repository', async () => {
+    const [packageJson, packScript, releaseWorkflow] = await Promise.all([
+      readFile(repoFile('package.json'), 'utf8'),
+      readFile(repoFile('scripts/pack-electron.mjs'), 'utf8'),
+      readFile(repoFile('.github/workflows/release-windows.yml'), 'utf8'),
+    ])
+
+    const releaseContract = [packageJson, packScript, releaseWorkflow].join('\n')
+    expect(releaseContract).not.toContain('fetch-client-data.mjs')
+    expect(releaseContract).not.toContain('resources/client-data')
+    expect(releaseContract).not.toContain('resources\\client-data')
+  })
 })
